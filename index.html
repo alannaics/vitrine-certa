@@ -83,12 +83,10 @@ function copyAiOutput(){const t=el("aiOutput").value;if(!t){alert("Gere um conte
 let discoveryItems=[];
 async function runDiscovery(){
  const status=el("discoveryStatus"),button=el("runDiscovery"),results=el("discoveryResults");
- const token=el("dashboardToken")?.value.trim()||sessionStorage.getItem("vcDashboardToken")||"";
- if(!token){status.textContent="Informe o token privado em Configurações para autorizar a consulta.";return;}
  button.disabled=true;status.textContent="Pesquisando anúncios de várias categorias...";
  results.innerHTML="";
  try{
-  const r=await fetch("/api/mercadolivre/discovery",{headers:{"x-dashboard-token":token}});
+  const r=await fetch("/api/mercadolivre/discovery");
   const d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(d.error||"Não foi possível consultar o Mercado Livre.");
   discoveryItems=d.products||[];
