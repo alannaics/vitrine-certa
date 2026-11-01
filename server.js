@@ -240,7 +240,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 1200 } })
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 1200, thinkingConfig: { thinkingLevel: "low" } } })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
