@@ -79,7 +79,7 @@ function exportCSV(){let rows=[["Tipo","Produto","Categoria","Plataforma","Preç
 
 async function checkConnections(){
  const badge=el("shopeeStatus"); if(!badge)return; badge.textContent="Verificando...";
- try{const r=await fetch("/api/status");const d=await r.json();badge.textContent=d.shopee?.configured?"API configurada":"Aguardando credenciais no servidor";badge.style.background=d.shopee?.configured?"#e8f6ee":"#fff1f5";badge.style.color=d.shopee?.configured?"#23794d":"#ae416d";}
+ try{const r=await fetch("/api/status");const d=await r.json();badge.textContent=d.shopee?.configured?"API configurada":"Aguardando credenciais no servidor";badge.style.background=d.shopee?.configured?"#e8f6ee":"#fff1f5";badge.style.color=d.shopee?.configured?"#23794d":"#ae416d";const ml=el("mlStatus");if(ml){ml.textContent=d.mercadoLivre?.connected?"Conectado nesta sessão":(d.mercadoLivre?.configured?"Pronto para autorizar":"Aguardando credenciais");}}
  catch(e){badge.textContent="Servidor ainda não publicado";badge.style.background="#fff7e9";badge.style.color="#795b24";}
 }
 
