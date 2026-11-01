@@ -58,10 +58,60 @@ function requireDashboardToken(req, res, next) {
   next();
 }
 
+
+const ML_CLIENT_ID = process.env.ML_CLIENT_ID;
+const ML_CLIENT_SECRET = process.env.ML_CLIENT_SECRET;
+const ML_REDIRECT_URI = process.env.ML_REDIRECT_URI || "https://vitrine-certa.onrender.com/oauth/mercadolivre/callback";
+let mlAccessToken = null;
+let mlRefreshToken = null;
+let mlTokenExpiresAt = 0;
+let mlOAuthState = null;
+
+function mlConfigured() {
+  return Boolean(ML_CLIENT_ID && ML_CLIENT_SECRET && ML_REDIRECT_URI);
+}
+function safeEqual(a, b) {
+  const x = Buffer.from(String(a || ""));
+  const y = Buffer.from(String(b || ""));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+async function mlTokenRequest(body) {
+  const response = await fetch("https://api.mercadolibre.com/oauth/token", {
+    method: "POST",
+    headers: { "accept": "application/json", "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(body)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.message || data.error_description || data.error || "Falha na autenticação do Mercado Livre.");
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+async function ensureMlToken() {
+  if (mlAccessToken && Date.now() < mlTokenExpiresAt - 60000) return mlAccessToken;
+  if (!mlRefreshToken) {
+    const error = new Error("Conecte sua conta do Mercado Livre novamente.");
+    error.status = 401;
+    throw error;
+  }
+  const data = await mlTokenRequest({
+    grant_type: "refresh_token",
+    client_id: ML_CLIENT_ID,
+    client_secret: ML_CLIENT_SECRET,
+    refresh_token: mlRefreshToken
+  });
+  mlAccessToken = data.access_token;
+  mlRefreshToken = data.refresh_token;
+  mlTokenExpiresAt = Date.now() + Number(data.expires_in || 21600) * 1000;
+  return mlAccessToken;
+}
+
 app.get("/api/status", (_req, res) => {
   res.json({
     shopee: { configured: Boolean(APP_ID && APP_SECRET) },
-    mercadoLivre: { mode: "manual", note: "Links e relatórios devem ser inseridos pelo painel oficial; não há API pública de afiliados confirmada para esta integração." }
+    mercadoLivre: { configured: mlConfigured(), connected: Boolean(mlRefreshToken), mode: mlRefreshToken ? "oauth_connected_memory" : "manual", note: "OAuth de consulta da API de vendedores; métricas de afiliados permanecem separadas." }
   });
 });
 
@@ -117,6 +167,52 @@ app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
     const data = await shopeeRequest(query);
     res.json(data?.conversionReport || { nodes: [], pageInfo: {} });
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+});
+
+
+app.get("/oauth/mercadolivre/callback", async (req, res) => {
+  try {
+    if (!mlConfigured()) return res.status(503).send("Configure ML_CLIENT_ID, ML_CLIENT_SECRET e ML_REDIRECT_URI no Render.");
+    if (!mlOAuthState || !safeEqual(req.query.state, mlOAuthState)) return res.status(400).send("Estado OAuth inválido ou expirado. Volte ao Vitrine Certa e tente conectar novamente.");
+    mlOAuthState = null;
+    if (req.query.error) return res.status(400).send("Autorização não concluída: " + String(req.query.error_description || req.query.error));
+    const code = String(req.query.code || "");
+    if (!code) return res.status(400).send("Código de autorização não recebido.");
+    const data = await mlTokenRequest({
+      grant_type: "authorization_code",
+      client_id: ML_CLIENT_ID,
+      client_secret: ML_CLIENT_SECRET,
+      code,
+      redirect_uri: ML_REDIRECT_URI
+    });
+    mlAccessToken = data.access_token;
+    mlRefreshToken = data.refresh_token;
+    mlTokenExpiresAt = Date.now() + Number(data.expires_in || 21600) * 1000;
+    res.type("html").send("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Mercado Livre conectado</title><body style='font:16px system-ui;max-width:560px;margin:12vh auto;padding:24px;color:#28232a'><h2>Autorização recebida</h2><p>O Mercado Livre foi conectado ao Vitrine Certa nesta sessão do servidor.</p><p>Volte ao painel para verificar o status. No plano gratuito, uma reinicialização pode exigir nova autorização.</p><a href='/'>Voltar ao Vitrine Certa</a></body></html>");
+  } catch (e) { res.status(e.status || 500).send("Não foi possível concluir a conexão: " + String(e.message)); }
+});
+
+app.post("/api/mercadolivre/auth-url", requireDashboardToken, (_req, res) => {
+  if (!mlConfigured()) return res.status(503).json({ error: "Configure as variáveis ML_CLIENT_ID, ML_CLIENT_SECRET e ML_REDIRECT_URI no Render." });
+  mlOAuthState = crypto.randomBytes(24).toString("hex");
+  const url = new URL("https://auth.mercadolivre.com.br/authorization");
+  url.search = new URLSearchParams({
+    response_type: "code",
+    client_id: ML_CLIENT_ID,
+    redirect_uri: ML_REDIRECT_URI,
+    state: mlOAuthState
+  }).toString();
+  res.json({ authorizationUrl: url.toString() });
+});
+
+app.get("/api/mercadolivre/me", requireDashboardToken, async (_req, res) => {
+  try {
+    const token = await ensureMlToken();
+    const response = await fetch("https://api.mercadolibre.com/users/me", { headers: { Authorization: "Bearer " + token } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "Falha ao consultar a conta Mercado Livre.");
+    res.json({ connected: true, nickname: data.nickname || null, userId: data.id || null, expiresAt: mlTokenExpiresAt });
+  } catch (e) { res.status(e.status || 500).json({ connected: false, error: e.message }); }
 });
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
