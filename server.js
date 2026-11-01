@@ -171,7 +171,7 @@ app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
 
 
 
-app.get("/api/mercadolivre/discovery", requireDashboardToken, async (req, res) => {
+app.get("/api/mercadolivre/discovery", async (req, res) => {
   try {
     // Pesquisa pública de anúncios: não depende da aprovação da API de afiliados nem do OAuth.
     const terms = [
