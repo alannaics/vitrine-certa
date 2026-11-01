@@ -7,7 +7,7 @@
 <div class="card">
 <h2>Garimpo Feminino · Mercado Livre</h2>
 <p class="muted">Pesquisa de produtos voltados ao público feminino em moda, beleza, acessórios, casa, bem-estar e tecnologia. A seleção usa sinais públicos do anúncio; não identifica o gênero real de compradores.</p>
-<div class="toolbar"><button class="btn primary" id="runDiscovery" onclick="runDiscovery()">Buscar produtos em alta</button><span id="discoveryStatus" class="muted">A busca exige a conexão do Mercado Livre ativa no servidor e o token privado do painel.</span></div>
+<div class="toolbar"><button class="btn primary" id="runDiscovery" onclick="runDiscovery()">Buscar produtos em alta</button><span id="discoveryStatus" class="muted">A pesquisa pública de anúncios não exige aprovação da API de afiliados. Use o token privado do painel para autorizar a busca.</span></div>
 <div class="notice">A quantidade vendida é um indicador do anúncio, não uma garantia de vendas futuras. Comissão de afiliado, avaliações e dados de conversão podem não estar disponíveis nesta API.</div>
 </div>
 <div id="discoveryResults" class="grid content" style="margin-top:14px"></div>
@@ -73,7 +73,7 @@ const sample=[
 let db=JSON.parse(localStorage.getItem("vitrineCerta")||"null")||{products:sample,metrics:{clicks:0,sales:0,commission:0,period:""},calendar:{},settings:{}},editing=-1;
 const el=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),safe=s=>String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function save(){localStorage.setItem("vitrineCerta",JSON.stringify(db));render()}
-function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));let n={home:"Visão geral",products:"Produtos",calendar:"Plano de 30 dias",scripts:"Conteúdos prontos",results:"Resultados",settings:"Configurações"};el("title").textContent=n[id]}
+function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));let n={home:"Visão geral",products:"Produtos",discovery:"Garimpo feminino",calendar:"Plano de 30 dias",scripts:"Conteúdos prontos",results:"Resultados",settings:"Configurações"};el("title").textContent=n[id]}
 el("nav").onclick=e=>{let b=e.target.closest("button[data-page]");if(b)showPage(b.dataset.page)};
 function renderAiProducts(){const sel=el("aiProduct");if(!sel)return;const old=sel.value;sel.innerHTML=db.products.map((p,i)=>"<option value=\""+i+"\">"+safe(p.name)+"</option>").join("");if(old&&Number(old)<db.products.length)sel.value=old;}
 async function checkGemini(){const status=el("aiStatus");if(!status)return;try{const r=await fetch("/api/gemini/status");const d=await r.json();status.textContent=d.configured?"Gemini configurado. Pronto para gerar conteúdo.":"Gemini aguardando chave no servidor.";}catch(e){status.textContent="Não foi possível verificar a IA.";}}
