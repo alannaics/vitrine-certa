@@ -171,52 +171,55 @@ app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
 
 
 
-app.get("/api/mercadolivre/discovery", async (req, res) => {
+app.get("/api/mercadolivre/discovery", async (_req, res) => {
   try {
-    // Pesquisa pública de anúncios: não depende da aprovação da API de afiliados nem do OAuth.
-    const terms = [
-      "moda feminina", "bolsa feminina", "tenis feminino", "maquiagem",
-      "skincare", "acessorios femininos", "organizacao casa", "tecnologia feminina"
-    ];
-    const searches = await Promise.all(terms.map(async (q) => {
-      const url = new URL("https://api.mercadolibre.com/sites/MLB/search");
-      url.search = new URLSearchParams({ q, sort: "sold_quantity_desc", limit: "20" }).toString();
-      const response = await fetch(url, { headers: { Accept: "application/json" } });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || "Falha na pesquisa pública do Mercado Livre (HTTP " + response.status + ").");
-      return (data.results || []).map(item => ({ ...item, searchTerm: q }));
-    }));
-    const unique = new Map();
-    for (const item of searches.flat()) {
-      if (!item.id || unique.has(String(item.id))) continue;
-      const sold = Number(item.sold_quantity || 0);
-      const price = Number(item.price || 0);
-      if (!price) continue;
-      const score = Math.min(100, Math.round(
-        Math.min(65, Math.log10(sold + 1) * 20) +
-        (item.shipping?.free_shipping ? 10 : 0) +
-        (item.condition === "new" ? 10 : 0) +
-        (Number(item.original_price) > price ? 10 : 0) +
-        (Number(item.available_quantity || 0) > 0 ? 5 : 0)
-      ));
-      unique.set(String(item.id), {
-        id: String(item.id), title: item.title, price, permalink: item.permalink,
-        thumbnail: item.thumbnail, category: item.category_id || "",
-        soldQuantity: sold, freeShipping: Boolean(item.shipping?.free_shipping), score,
-        originalPrice: item.original_price || null, searchTerm: item.searchTerm
-      });
+    // Usa o recurso oficial /trends, evitando /sites/MLB/search que pode retornar 403.
+    const token = await ensureMlToken();
+    const response = await fetch("https://api.mercadolibre.com/trends/MLB", {
+      headers: { Authorization: "Bearer " + token, Accept: "application/json" }
+    });
+    const data = await response.json().catch(() => []);
+    if (!response.ok) {
+      const message = data.message || data.error || "Falha ao consultar tendências oficiais do Mercado Livre (HTTP " + response.status + ").";
+      const error = new Error(message);
+      error.status = response.status;
+      throw error;
     }
-    const products = [...unique.values()]
-      .sort((a,b) => b.soldQuantity-a.soldQuantity || b.score-a.score)
-      .slice(0,5);
+    const femaleTerms = /feminin|mulher|maquiagem|skincare|beleza|bolsa|biqu[ií]ni|legging|academia|cabelo|unha|organizador|cozinha|decora[cç][aã]o|casa|tenis|sapato|sand[aá]lia|vestido|blusa|cal[cç]a|perfume|escova|secador|chapinha|joia|biju|acess[oó]rio|celular|fone|smartwatch/i;
+    const trends = (Array.isArray(data) ? data : [])
+      .map((item, index) => ({
+        keyword: String(item.keyword || "").trim(),
+        url: String(item.url || ""),
+        trendType: index < 10 ? "Crescimento" : index < 30 ? "Mais buscado" : "Popular"
+      }))
+      .filter(item => item.keyword && femaleTerms.test(item.keyword))
+      .slice(0, 5)
+      .map((item, index) => ({
+        id: "trend-" + index + "-" + Buffer.from(item.keyword).toString("base64url").slice(0, 12),
+        title: item.keyword,
+        price: null,
+        permalink: item.url || "https://lista.mercadolivre.com.br/" + encodeURIComponent(item.keyword),
+        thumbnail: null,
+        category: "Tendência de busca",
+        soldQuantity: null,
+        freeShipping: false,
+        score: null,
+        trendType: item.trendType,
+        isTrend: true
+      }));
     res.json({
-      products,
+      products: trends,
       updatedAt: new Date().toISOString(),
-      source: "Pesquisa pública de anúncios do Mercado Livre",
-      note: "Ranking baseado na quantidade vendida exibida nos anúncios e sinais públicos. Não informa comissão de afiliado nem prevê vendas futuras."
+      source: "API oficial de Tendências do Mercado Livre",
+      note: "Tendências de busca atualizadas semanalmente. Não são anúncios de produtos: preço, vendedor, estoque e comissão precisam ser conferidos ao abrir os resultados."
     });
   } catch (e) {
-    res.status(502).json({ error: e.message || "Falha no garimpo do Mercado Livre." });
+    const status = e.status === 401 ? 401 : e.status === 403 ? 403 : 502;
+    res.status(status).json({
+      error: status === 401
+        ? "A autorização do Mercado Livre expirou ou não está ativa neste servidor. Reconecte a conta em Configurações."
+        : e.message || "Falha no garimpo de tendências do Mercado Livre."
+    });
   }
 });
 
