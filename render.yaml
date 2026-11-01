@@ -8,6 +8,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
+      - key: DASHBOARD_API_TOKEN
+        sync: false
       - key: SHOPEE_APP_ID
         sync: false
       - key: SHOPEE_APP_SECRET
