@@ -7,8 +7,8 @@
 <div class="card">
 <h2>Garimpo Feminino · Mercado Livre</h2>
 <p class="muted">Pesquisa de produtos voltados ao público feminino em moda, beleza, acessórios, casa, bem-estar e tecnologia. A seleção usa sinais públicos do anúncio; não identifica o gênero real de compradores.</p>
-<div class="toolbar"><button class="btn primary" id="runDiscovery" onclick="runDiscovery()">Buscar produtos em alta</button><span id="discoveryStatus" class="muted">A pesquisa pública de anúncios não exige aprovação da API de afiliados. Use o token privado do painel para autorizar a busca.</span></div>
-<div class="notice">A quantidade vendida é um indicador do anúncio, não uma garantia de vendas futuras. Comissão de afiliado, avaliações e dados de conversão podem não estar disponíveis nesta API.</div>
+<div class="toolbar"><button class="btn primary" id="runDiscovery" onclick="runDiscovery()">Buscar produtos em alta</button><span id="discoveryStatus" class="muted">A pesquisa pública de anúncios não exige aprovação da API de afiliados. A busca usa a conexão oficial do Mercado Livre. Se a autorização expirar, reconecte em Configurações.</span></div>
+<div class="notice">As tendências representam buscas populares da semana, não anúncios. Abra os resultados para conferir preço, vendedor, estoque e avaliações; depois gere/adicione seu link oficial de afiliado.</div>
 </div>
 <div id="discoveryResults" class="grid content" style="margin-top:14px"></div>
 </section>
@@ -91,15 +91,15 @@ async function runDiscovery(){
   if(!r.ok)throw new Error(d.error||"Não foi possível consultar o Mercado Livre.");
   discoveryItems=d.products||[];
   if(!discoveryItems.length){status.textContent="A busca terminou, mas a API não retornou anúncios com dados suficientes. Verifique a conexão e tente novamente.";return;}
-  status.textContent="Pesquisa concluída: "+discoveryItems.length+" oportunidades encontradas. Atualizado em "+new Date(d.updatedAt).toLocaleString("pt-BR")+".";
-  results.innerHTML=discoveryItems.map((p,i)=>'<article class="discovery-card"><img loading="lazy" src="'+safe(p.thumbnail||"")+'" alt=""><span class="pill">#'+(i+1)+' · Potencial '+p.score+'/100</span><h3>'+safe(p.title)+'</h3><div class="discovery-meta">'+safe(p.category||"Categoria não informada")+'</div><b>'+fmt(p.price)+'</b><div class="discovery-meta">Vendas indicadas: '+Number(p.soldQuantity||0).toLocaleString("pt-BR")+' · '+(p.freeShipping?"Frete grátis indicado":"Frete a confirmar")+'</div><div class="toolbar"><a class="btn" target="_blank" rel="noopener" href="'+safe(p.permalink)+'">Ver anúncio</a><button class="btn primary" onclick="saveDiscoveryProduct('+i+')">Adicionar aos produtos</button></div><div class="discovery-meta">Anúncio comum. Adicione seu link de afiliado depois de gerar/validar no painel oficial.</div></article>').join("");
+  status.textContent="Pesquisa concluída: "+discoveryItems.length+" tendências femininas encontradas. Atualizado em "+new Date(d.updatedAt).toLocaleString("pt-BR")+".";
+  results.innerHTML=discoveryItems.map((p,i)=>'<article class="discovery-card">'+(p.thumbnail?'<img loading="lazy" src="'+safe(p.thumbnail)+'" alt="">':'<div class="notice">Tendência de busca semanal</div>')+'<span class="pill">#'+(i+1)+' · '+safe(p.trendType||"Tendência")+'</span><h3>'+safe(p.title)+'</h3><div class="discovery-meta">Termo em alta nas buscas do Mercado Livre</div><div class="toolbar"><a class="btn" target="_blank" rel="noopener" href="'+safe(p.permalink)+'">Ver produtos relacionados</a><button class="btn primary" onclick="saveDiscoveryProduct('+i+')">Salvar tendência</button></div><div class="discovery-meta">Preço, vendas do anúncio e comissão ainda precisam ser validados no produto escolhido.</div></article>').join("");
  }catch(e){status.textContent=e.message;}
  finally{button.disabled=false;}
 }
 function saveDiscoveryProduct(i){
  const p=discoveryItems[i];if(!p)return;
  if(db.products.some(x=>x.sourceId===String(p.id))){alert("Este produto já está no seu banco.");return;}
- db.products.unshift({name:p.title,category:p.category||"Público feminino",platform:"Mercado Livre",price:String(p.price||""),rate:"",link:"",notes:"Encontrado no Garimpo Feminino. Vendas indicadas: "+(p.soldQuantity||0)+". Score: "+p.score+"/100. Anúncio: "+p.permalink,sourceId:String(p.id)});
+ db.products.unshift({name:p.title,category:p.category||"Tendência de busca",platform:"Mercado Livre",price:"",rate:"",link:"",notes:"Tendência semanal ("+(p.trendType||"Mercado Livre")+"). Ainda não é um anúncio nem link de afiliado. Pesquisar e validar produto, preço, vendedor e comissão. Busca: "+p.permalink,sourceId:String(p.id)});
  save();alert("Produto adicionado. Insira seu link de afiliado antes de divulgar.");
 }
 function render(){let m=db.metrics;["vClicks","rClicks"].forEach(id=>el(id).textContent=m.clicks||0);["vSales","rSales"].forEach(id=>el(id).textContent=m.sales||0);["vCommission","rCommission"].forEach(id=>el(id).textContent=fmt(m.commission));el("vProducts").textContent=db.products.length;el("rRate").textContent=(m.clicks?100*m.sales/m.clicks:0).toLocaleString("pt-BR",{maximumFractionDigits:1})+"%";el("clicks").value=m.clicks||0;el("sales").value=m.sales||0;el("commission").value=m.commission||0;el("period").value=m.period||"";renderProducts();renderAiProducts();renderDays();renderScripts();el("upcoming").innerHTML=themes.slice(0,4).map((t,i)=>'<div class="row"><div><b>Dia '+(i+1)+' · '+safe(t[0])+'</b><div class="muted">'+safe(t[1])+'</div></div><span class="pill">'+safe(db.calendar[i]||"Pendente")+'</span></div>').join("");let c=db.settings;el("brand").value=c.brand||"Vitrine Certa";el("social").value=c.social||"";el("defaultLink").value=c.defaultLink||"";el("notes").value=c.notes||""}
