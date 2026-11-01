@@ -16,7 +16,7 @@ O GitHub Pages não executa o backend e não pode guardar credenciais secretas. 
 1. Entre em https://render.com/ e conecte o GitHub.
 2. Crie um **Blueprint** e selecione este repositório.
 3. O Render lerá `render.yaml` e criará o serviço web.
-4. Nas variáveis de ambiente do serviço, configure `SHOPEE_APP_ID` e `SHOPEE_APP_SECRET`. Insira os valores diretamente no painel privado do Render — nunca no GitHub, no HTML ou no chat.
+4. Nas variáveis de ambiente do serviço, configure `SHOPEE_APP_ID`, `SHOPEE_APP_SECRET` e `DASHBOARD_API_TOKEN`. Insira os valores diretamente no painel privado do Render — nunca no GitHub, no HTML ou no chat.
 5. Aguarde o deploy. O painel e as rotas `/api/*` serão servidos pelo mesmo endereço.
 
 O plano gratuito do Render pode suspender o serviço após inatividade; a primeira abertura depois disso pode demorar. Consulte as condições atuais do plano antes de depender de sincronizações agendadas.
@@ -38,7 +38,7 @@ O catálogo aceita links de afiliado gerados no painel oficial do Mercado Livre.
 - As credenciais Shopee são lidas exclusivamente de variáveis de ambiente do backend.
 - Não compartilhe App Secret, senha da conta, cookies ou tokens em conversas.
 - Se um segredo for publicado acidentalmente, revogue-o/regenere-o na Shopee.
-- O frontend guarda os dados de catálogo e métricas no armazenamento local do navegador; faça backup CSV.
+- As rotas privadas da Shopee exigem `DASHBOARD_API_TOKEN`. Informe o mesmo token no campo privado da tela de conexões; ele permanece apenas na sessão atual do navegador. O frontend guarda os dados de catálogo e métricas no armazenamento local do navegador; faça backup CSV.
 
 ## Observações
 Os produtos de exemplo são apenas ideias de pesquisa, não ofertas verificadas. Confirme preço final com frete, estoque, reputação, avaliações, prazos e comissão nos marketplaces antes de divulgar.
