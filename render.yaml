@@ -14,3 +14,9 @@ services:
         sync: false
       - key: SHOPEE_APP_SECRET
         sync: false
+      - key: ML_CLIENT_ID
+        sync: false
+      - key: ML_CLIENT_SECRET
+        sync: false
+      - key: ML_REDIRECT_URI
+        value: https://vitrine-certa.onrender.com/oauth/mercadolivre/callback
