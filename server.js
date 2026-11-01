@@ -215,5 +215,43 @@ app.get("/api/mercadolivre/me", requireDashboardToken, async (_req, res) => {
   } catch (e) { res.status(e.status || 500).json({ connected: false, error: e.message }); }
 });
 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.Gemini_API_Key;
+app.get("/api/gemini/status", (_req, res) => res.json({ configured: Boolean(GEMINI_API_KEY) }));
+app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) return res.status(503).json({ error: "Configure GEMINI_API_KEY (ou Gemini_API_Key) no Render." });
+    const product = String(req.body?.product || "").slice(0, 500);
+    const price = String(req.body?.price || "").slice(0, 80);
+    const link = String(req.body?.link || "").slice(0, 1000);
+    const format = String(req.body?.format || "Roteiro para vídeo curto").slice(0, 100);
+    const details = String(req.body?.details || "").slice(0, 1000);
+    if (!product) return res.status(400).json({ error: "Selecione ou informe um produto." });
+    const prompt = [
+      "Você é redator de marketing de afiliados para a Vitrine Certa, no Brasil.",
+      "Crie conteúdo em português brasileiro, natural, objetivo e persuasivo, sem promessas enganosas.",
+      "Não invente avaliações, vendas, características, descontos, escassez ou resultados. Use apenas os dados fornecidos; se faltarem, recomende conferir no anúncio.",
+      "Inclua chamada para ação e aviso transparente de link de afiliado. Informe que preço e estoque podem mudar.",
+      "Formato solicitado: " + format,
+      "Produto: " + product,
+      "Preço informado: " + (price || "não informado"),
+      "Link de afiliado: " + (link || "não informado"),
+      "Informações adicionais: " + (details || "nenhuma")
+    ].join("\n");
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 1200 } })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data.error?.message || "Falha ao gerar conteúdo no Gemini.";
+      return res.status(response.status === 429 ? 429 : 502).json({ error: message });
+    }
+    const text = (data.candidates || []).flatMap(c => c.content?.parts || []).map(p => p.text || "").join("\n").trim();
+    if (!text) return res.status(502).json({ error: "O Gemini não retornou texto. Tente novamente." });
+    res.json({ text, model: "gemini-2.5-flash" });
+  } catch (e) { res.status(500).json({ error: e.message || "Erro ao consultar o Gemini." }); }
+});
+
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.listen(PORT, () => console.log("Vitrine Certa API listening on " + PORT));
