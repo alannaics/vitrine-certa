@@ -46,6 +46,18 @@ async function shopeeRequest(query) {
   return data.data;
 }
 
+function requireDashboardToken(req, res, next) {
+  const expected = process.env.DASHBOARD_API_TOKEN;
+  const supplied = req.get("x-dashboard-token") || "";
+  if (!expected) return res.status(503).json({ error: "Configure DASHBOARD_API_TOKEN no ambiente do servidor." });
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: "Token de acesso inválido." });
+  }
+  next();
+}
+
 app.get("/api/status", (_req, res) => {
   res.json({
     shopee: { configured: Boolean(APP_ID && APP_SECRET) },
@@ -53,7 +65,7 @@ app.get("/api/status", (_req, res) => {
   });
 });
 
-app.post("/api/shopee/short-link", async (req, res) => {
+app.post("/api/shopee/short-link", requireDashboardToken, async (req, res) => {
   try {
     const originUrl = String(req.body?.originUrl || "");
     const subIds = Array.isArray(req.body?.subIds) ? req.body.subIds.slice(0, 5).map(x => String(x).slice(0, 50)) : [];
@@ -72,7 +84,7 @@ app.post("/api/shopee/short-link", async (req, res) => {
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
-app.get("/api/shopee/products", async (req, res) => {
+app.get("/api/shopee/products", requireDashboardToken, async (req, res) => {
   try {
     const keyword = String(req.query.keyword || "").slice(0, 80).replace(/["\\]/g, "");
     const page = Math.max(1, Math.min(50, Number(req.query.page) || 1));
@@ -87,7 +99,7 @@ app.get("/api/shopee/products", async (req, res) => {
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
-app.get("/api/shopee/conversions", async (req, res) => {
+app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
   try {
     const start = Number(req.query.start);
     const end = Number(req.query.end);
