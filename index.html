@@ -85,7 +85,7 @@ async function checkConnections(){
 async function makeShopeeLink(){
  const result=el("shopeeLinkResult"),originUrl=el("shopeeOrigin").value.trim(),subIds=el("shopeeSubs").value.split(",").map(x=>x.trim()).filter(Boolean);
  result.textContent="Solicitando link à Shopee...";
- try{const r=await fetch("/api/shopee/short-link",{method:"POST",headers:{"Content-Type":"application/json"},headers:{"Content-Type":"application/json","x-dashboard-token":el("dashboardToken").value.trim()||sessionStorage.getItem("vcDashboardToken")||""},body:JSON.stringify({originUrl,subIds})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Não foi possível gerar o link.");result.innerHTML=d.shortLink?'<b>Link gerado:</b> <a target="_blank" rel="noopener" href="'+safe(d.shortLink)+'">'+safe(d.shortLink)+'</a> <button class="btn" onclick="navigator.clipboard.writeText('+JSON.stringify(d.shortLink)+')">Copiar</button>':"A API não retornou um link.";}
+ try{const r=await fetch("/api/shopee/short-link",{method:"POST",headers:{"Content-Type":"application/json","x-dashboard-token":el("dashboardToken").value.trim()||sessionStorage.getItem("vcDashboardToken")||""},body:JSON.stringify({originUrl,subIds})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Não foi possível gerar o link.");result.innerHTML=d.shortLink?'<b>Link gerado:</b> <a target="_blank" rel="noopener" href="'+safe(d.shortLink)+'">'+safe(d.shortLink)+'</a> <button class="btn" onclick="navigator.clipboard.writeText('+JSON.stringify(d.shortLink)+')">Copiar</button>':"A API não retornou um link.";}
  catch(e){result.textContent=e.message;}
 }
 
