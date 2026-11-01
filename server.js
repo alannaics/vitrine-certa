@@ -170,6 +170,51 @@ app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
 });
 
 
+
+app.get("/api/mercadolivre/discovery", requireDashboardToken, async (req, res) => {
+  try {
+    const token = await ensureMlToken();
+    const terms = [
+      "moda feminina", "bolsa feminina", "tenis feminino", "maquiagem",
+      "skincare", "acessorios femininos", "organizacao casa", "autocuidado feminino"
+    ];
+    const searches = await Promise.all(terms.map(async (q) => {
+      const url = new URL("https://api.mercadolibre.com/sites/MLB/search");
+      url.search = new URLSearchParams({ q, sort: "sold_quantity_desc", limit: "12" }).toString();
+      const response = await fetch(url, { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Falha na pesquisa do Mercado Livre (HTTP " + response.status + ").");
+      return (data.results || []).map(item => ({ ...item, searchTerm: q }));
+    }));
+    const unique = new Map();
+    for (const item of searches.flat()) {
+      if (!item.id || unique.has(String(item.id))) continue;
+      const sold = Number(item.sold_quantity || 0);
+      const price = Number(item.price || 0);
+      if (!price) continue;
+      const score = Math.min(100, Math.round(
+        Math.min(55, Math.log10(sold + 1) * 18) +
+        (item.shipping?.free_shipping ? 10 : 0) +
+        (item.condition === "new" ? 10 : 0) +
+        (Number(item.original_price) > price ? 15 : 0) +
+        Math.min(10, Number(item.available_quantity || 0) > 0 ? 10 : 0)
+      ));
+      unique.set(String(item.id), {
+        id: String(item.id), title: item.title, price, permalink: item.permalink,
+        thumbnail: item.thumbnail, category: item.category_id || "",
+        soldQuantity: sold, freeShipping: Boolean(item.shipping?.free_shipping), score,
+        originalPrice: item.original_price || null
+      });
+    }
+    const products = [...unique.values()]
+      .sort((a,b) => b.score-a.score || b.soldQuantity-a.soldQuantity)
+      .slice(0,5);
+    res.json({ products, updatedAt: new Date().toISOString(), source: "Mercado Livre public search API", note: "Score indicativo; não representa comissão nem previsão garantida de vendas." });
+  } catch (e) {
+    res.status(e.status || 502).json({ error: e.message || "Falha no garimpo do Mercado Livre." });
+  }
+});
+
 app.get("/oauth/mercadolivre/callback", async (req, res) => {
   try {
     if (!mlConfigured()) return res.status(503).send("Configure ML_CLIENT_ID, ML_CLIENT_SECRET e ML_REDIRECT_URI no Render.");
