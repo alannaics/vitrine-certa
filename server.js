@@ -237,7 +237,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
       "Link de afiliado: " + (link || "não informado"),
       "Informações adicionais: " + (details || "nenhuma")
     ].join("\n");
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 1200 } })
@@ -249,7 +249,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
     }
     const text = (data.candidates || []).flatMap(c => c.content?.parts || []).map(p => p.text || "").join("\n").trim();
     if (!text) return res.status(502).json({ error: "O Gemini não retornou texto. Tente novamente." });
-    res.json({ text, model: "gemini-2.5-flash" });
+    res.json({ text, model: "gemini-3.8-flash" });
   } catch (e) { res.status(500).json({ error: e.message || "Erro ao consultar o Gemini." }); }
 });
 
