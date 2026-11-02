@@ -110,6 +110,8 @@ async function loadMlTokens() {
 async function initializeDatabase() {
   if (!db) return;
   await db.query("CREATE TABLE IF NOT EXISTS app_secrets (secret_name TEXT PRIMARY KEY, secret_value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+  await db.query("CREATE TABLE IF NOT EXISTS dashboard_state (id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1), state JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+  await db.query("CREATE TABLE IF NOT EXISTS saved_campaigns (id TEXT PRIMARY KEY, product_name TEXT NOT NULL, format TEXT, content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await loadMlTokens();
 }
 const ML_CLIENT_SECRET = process.env.ML_CLIENT_SECRET;
@@ -419,6 +421,33 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
   } catch (e) { console.error("Gemini generation failed:", e); res.status(502).json({ error: "Falha na comunicação com o serviço de IA: " + (e.message || "erro desconhecido") }); }
 });
 
+app.get("/api/dashboard/state", requireDashboardToken, async (_req, res) => {
+  if (!db) return res.status(503).json({ error: "Banco de dados não configurado." });
+  try {
+    const result = await db.query("SELECT state, updated_at FROM dashboard_state WHERE id = 1");
+    if (!result.rows.length) return res.json({ exists: false, state: null, updatedAt: null });
+    return res.json({ exists: true, state: result.rows[0].state, updatedAt: result.rows[0].updated_at });
+  } catch (error) {
+    console.error("[Dashboard state GET]", error.message);
+    return res.status(500).json({ error: "Não foi possível carregar os dados salvos." });
+  }
+});
+app.put("/api/dashboard/state", requireDashboardToken, async (req, res) => {
+  if (!db) return res.status(503).json({ error: "Banco de dados não configurado." });
+  const state = req.body?.state;
+  if (!state || typeof state !== "object" || Array.isArray(state)) return res.status(400).json({ error: "Estado do painel inválido." });
+  if (!Array.isArray(state.products) || state.products.length > 2000) return res.status(400).json({ error: "Lista de produtos inválida ou acima do limite." });
+  if (!state.metrics || typeof state.metrics !== "object" || !state.calendar || typeof state.calendar !== "object" || !state.settings || typeof state.settings !== "object") return res.status(400).json({ error: "Dados de resultados, calendário ou configurações inválidos." });
+  try {
+    const payload = JSON.stringify({ products: state.products, metrics: state.metrics, calendar: state.calendar, settings: state.settings, campaigns: Array.isArray(state.campaigns) ? state.campaigns.slice(0, 500) : [], updatedAt: new Date().toISOString() });
+    if (Buffer.byteLength(payload, "utf8") > 900000) return res.status(413).json({ error: "Os dados do painel excedem o limite permitido." });
+    const result = await db.query("INSERT INTO dashboard_state (id, state, updated_at) VALUES (1, $1::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET state = EXCLUDED.state, updated_at = NOW() RETURNING updated_at", [payload]);
+    return res.json({ saved: true, updatedAt: result.rows[0].updated_at });
+  } catch (error) {
+    console.error("[Dashboard state PUT]", error.message);
+    return res.status(500).json({ error: "Não foi possível salvar os dados no banco." });
+  }
+});
 app.get("/api/health", async (_req, res) => {
   let database = "not_configured";
   if (db) {
