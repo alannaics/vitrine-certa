@@ -2,7 +2,7 @@
 :root{--p:#d95f88;--pale:#fff1f5;--ink:#28232a;--muted:#77717c;--line:#eee5e9}*{box-sizing:border-box}body{margin:0;background:#fffafb;color:var(--ink);font:15px system-ui,sans-serif}.app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}.side{background:white;border-right:1px solid var(--line);padding:24px 16px}.brand{font-size:19px;font-weight:800;padding:5px 10px 25px}.brand i{font-style:normal;color:var(--p)}nav{display:grid;gap:5px}nav button,.btn{border:1px solid var(--line);background:white;border-radius:10px;padding:10px 12px;text-align:left;font-weight:650;color:var(--ink);cursor:pointer}nav button.active{background:var(--pale);color:#ae416d;border-color:var(--pale)}.main{padding:30px;max-width:1400px;width:100%;margin:auto}h1{font-size:27px;margin:2px 0}h2{font-size:17px;margin:0 0 12px}.muted{color:var(--muted);font-size:12px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:12px}.eyebrow{font-size:11px;color:var(--p);font-weight:800;letter-spacing:1px;text-transform:uppercase}.primary{background:var(--p);color:white;border-color:var(--p)}.grid{display:grid;gap:14px}.stats{grid-template-columns:repeat(4,1fr);margin-bottom:16px}.two{grid-template-columns:1.2fr .8fr}.card{background:white;border:1px solid var(--line);border-radius:15px;padding:18px;box-shadow:0 8px 25px #33202a08}.value{font-size:26px;font-weight:800;margin:7px 0}.page{display:none}.page.show{display:block}.row{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}.notice{background:#fff7e9;color:#795b24;border-radius:10px;padding:13px;margin-bottom:15px;font-size:12px}.toolbar{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.field{border:1px solid var(--line);padding:10px;border-radius:9px;width:100%;background:white}.tablewrap{overflow:auto;background:white;border:1px solid var(--line);border-radius:12px}table{border-collapse:collapse;width:100%;min-width:650px}td,th{padding:12px;text-align:left;border-bottom:1px solid var(--line);font-size:12px}th{color:var(--muted);font-size:10px;text-transform:uppercase}.calendar{grid-template-columns:repeat(3,1fr)}.day,.script{border:1px solid var(--line);border-radius:12px;background:white;padding:14px}.day b,.pill{color:var(--p);font-size:11px}.day h3,.script h3{font-size:13px;margin:7px 0}.day p,.script p{font-size:12px;color:#625b66;white-space:pre-wrap}.content{grid-template-columns:repeat(2,1fr)}.discovery-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:14px;display:grid;gap:8px}.discovery-card img{width:100%;height:170px;object-fit:contain;background:#fff7fa;border-radius:10px}.discovery-card h3{font-size:14px;margin:0}.discovery-meta{font-size:12px;color:var(--muted)}.day select{width:100%;padding:7px;border:1px solid var(--line);border-radius:8px}.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.form label{font-size:11px;color:var(--muted);font-weight:700}.form input,.form select{display:block;margin-top:5px}.wide{grid-column:1/-1}.hidden{display:none!important}#modal{position:fixed;inset:0;background:#21151c88;display:grid;place-items:center;padding:15px}#modal .card{width:min(540px,100%);max-height:90vh;overflow:auto}@media(max-width:850px){.app{grid-template-columns:1fr}.side{padding:10px;border:0;border-bottom:1px solid var(--line)}.brand{padding:5px 8px 12px}nav{display:flex;overflow:auto}nav button{white-space:nowrap;font-size:12px}.main{padding:18px 12px}.stats{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.calendar{grid-template-columns:1fr 1fr}}@media(max-width:520px){.top{align-items:flex-start;flex-direction:column}.calendar,.content,.form{grid-template-columns:1fr}.wide{grid-column:auto}}
 </style></head><body><div class="app"><aside class="side"><div class="brand"><i>V</i> Vitrine Certa</div><nav id="nav"><button class="active" data-page="home">⌂ Visão geral</button><button data-page="products">◇ Produtos</button><button data-page="discovery">✦ Garimpo feminino</button><button data-page="calendar">▦ Plano 30 dias</button><button data-page="scripts">✎ Conteúdos</button><button data-page="results">↗ Resultados</button><button data-page="settings">⚙ Configurações</button></nav></aside><main class="main"><header class="top"><div><div class="eyebrow">Central de afiliados</div><h1 id="title">Visão geral</h1><div class="muted" id="subtitle">Organize produtos, publicações e resultados.</div></div><button class="btn primary" onclick="newProduct()">＋ Novo produto</button></header>
 <section class="page show" id="home"><div class="notice">Os produtos de exemplo são pautas para pesquisa, não ofertas verificadas. Confirme preço, estoque, avaliações, vendedor e comissão nos marketplaces antes de divulgar.</div><div class="grid stats"><div class="card">Cliques<div class="value" id="vClicks">0</div><small class="muted">Dados informados por você</small></div><div class="card">Vendas<div class="value" id="vSales">0</div><small class="muted">Pedidos aprovados</small></div><div class="card">Comissão<div class="value" id="vCommission">R$ 0,00</div><small class="muted">Valor acumulado</small></div><div class="card">Produtos<div class="value" id="vProducts">0</div><small class="muted">Cadastrados</small></div></div><div class="grid two"><div class="card"><h2>Próximas publicações</h2><div id="upcoming"></div></div><div class="card"><h2>Distribuição editorial sugerida</h2><div class="row"><span>Vídeos curtos</span><b>60%</b></div><div class="row"><span>Stories / status</span><b>25%</b></div><div class="row"><span>Carrosséis / listas</span><b>15%</b></div><p class="muted">Teste formatos e ajuste com base nos dados reais. Não há garantia de alcance ou renda.</p></div></div></section>
-<section class="page" id="products"><h2>Banco de produtos</h2><div class="toolbar"><input class="field" id="search" placeholder="Buscar..." style="max-width:240px" oninput="renderProducts()"><select class="field" id="filter" style="max-width:190px" onchange="renderProducts()"><option value="">Todas as plataformas</option><option>Shopee</option><option>Mercado Livre</option></select><button class="btn primary" onclick="newProduct()">Adicionar</button></div><div class="tablewrap"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Plataforma</th><th>Preço</th><th>Link afiliado</th><th></th></tr></thead><tbody id="productRows"></tbody></table></div></section>
+<section class="page" id="products"><h2>Banco de produtos</h2><p class="muted">A pontuação organiza os cadastros pela qualidade e completude dos dados. Não prevê vendas. Preencha preço, comissão, link e fonte/data para melhorar a avaliação.</p><div class="toolbar"><input class="field" id="search" placeholder="Buscar..." style="max-width:240px" oninput="renderProducts()"><select class="field" id="filter" style="max-width:190px" onchange="renderProducts()"><option value="">Todas as plataformas</option><option>Shopee</option><option>Mercado Livre</option></select><button class="btn primary" onclick="newProduct()">Adicionar</button></div><div class="tablewrap"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Plataforma</th><th>Preço</th><th>Qualidade dos dados</th><th>Link afiliado</th><th></th></tr></thead><tbody id="productRows"></tbody></table></div></section>
 <section class="page" id="discovery">
 <div class="card">
 <h2>Garimpo Feminino · Mercado Livre</h2>
@@ -70,9 +70,48 @@ const sample=[
 {name:"Luminária LED de mesa",category:"Utilidades",platform:"Shopee",price:"",rate:"",link:"",notes:"Candidato: verificar alimentação, brilho e tamanho."},
 {name:"Suporte articulado para celular",category:"Acessórios",platform:"Mercado Livre",price:"",rate:"",link:"",notes:"Candidato: testar estabilidade e compatibilidade."}
 ];
-let db=JSON.parse(localStorage.getItem("vitrineCerta")||"null")||{products:sample,metrics:{clicks:0,sales:0,commission:0,period:""},calendar:{},settings:{}},editing=-1;
+let db=JSON.parse(localStorage.getItem("vitrineCerta")||"null")||{products:sample,metrics:{clicks:0,sales:0,commission:0,period:""},calendar:{},settings:{},campaigns:[]},editing=-1;
+db.campaigns=Array.isArray(db.campaigns)?db.campaigns:[];
+let persistenceReady=false,persistenceTimer=null;
 const el=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),safe=s=>String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function save(){localStorage.setItem("vitrineCerta",JSON.stringify(db));render()}
+function save(){
+ db.updatedAt=new Date().toISOString();
+ localStorage.setItem("vitrineCerta",JSON.stringify(db));
+ render();
+ if(persistenceReady){clearTimeout(persistenceTimer);persistenceTimer=setTimeout(syncDashboardState,350);}
+}
+async function syncDashboardState(){
+ const token=el("dashboardToken")?.value.trim()||sessionStorage.getItem("vcDashboardToken")||"";
+ if(!token)return;
+ try{
+  const r=await fetch("/api/dashboard/state",{method:"PUT",headers:{"Content-Type":"application/json","x-dashboard-token":token},body:JSON.stringify({state:db})});
+  if(!r.ok){const d=await r.json().catch(()=>({}));console.warn("Persistência:",d.error||r.status);}
+ }catch(error){console.warn("Sincronização pendente; cópia local preservada.",error.message);}
+}
+async function loadDashboardState(){
+ const status=el("aiStatus"),token=el("dashboardToken")?.value.trim()||sessionStorage.getItem("vcDashboardToken")||"";
+ if(!token){persistenceReady=true;return;}
+ try{
+  const r=await fetch("/api/dashboard/state",{cache:"no-store",headers:{"x-dashboard-token":token}});
+  if(!r.ok){persistenceReady=true;return;}
+  const remote=await r.json(),local=JSON.parse(localStorage.getItem("vitrineCerta")||"null");
+  if(remote.exists&&remote.state){
+   const localTime=Date.parse(local?.updatedAt||0)||0,remoteTime=Date.parse(remote.updatedAt||0)||0;
+   db=localTime>remoteTime?local:remote.state;
+   db.campaigns=Array.isArray(db.campaigns)?db.campaigns:[];
+   localStorage.setItem("vitrineCerta",JSON.stringify(db));
+   if(localTime>remoteTime)await syncDashboardState();
+  }else{
+   db=local||db;db.campaigns=Array.isArray(db.campaigns)?db.campaigns:[];
+   await syncDashboardState();
+  }
+  persistenceReady=true;render();
+  if(status)status.textContent="Dados sincronizados com o banco de dados.";
+ }catch(error){
+  persistenceReady=true;
+  if(status)status.textContent="Banco indisponível. Seus dados continuam preservados neste navegador.";
+ }
+}
 function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));let n={home:"Visão geral",products:"Produtos",discovery:"Garimpo feminino",calendar:"Plano de 30 dias",scripts:"Conteúdos prontos",results:"Resultados",settings:"Configurações"};el("title").textContent=n[id]}
 el("nav").onclick=e=>{let b=e.target.closest("button[data-page]");if(b)showPage(b.dataset.page)};
 function renderAiProducts(){const sel=el("aiProduct");if(!sel)return;const old=sel.value;sel.innerHTML=db.products.map((p,i)=>"<option value=\""+i+"\">"+safe(p.name)+"</option>").join("");if(old&&Number(old)<db.products.length)sel.value=old;}
@@ -120,7 +159,9 @@ async function generateWithGemini(){
   if(!r.ok)throw new Error(d.error||"Erro HTTP "+r.status+" ao gerar a campanha.");
   if(!d.text)throw new Error("O serviço de IA respondeu sem conteúdo. Tente novamente.");
   out.value=d.text;
-  status.textContent="Pacote completo gerado com "+(d.model||"Gemini")+". Revise os dados antes de publicar.";
+  db.campaigns.unshift({id:"campaign-"+Date.now(),product:p.name,format:el("aiFormat").value,text:d.text,createdAt:new Date().toISOString()});
+  db.campaigns=db.campaigns.slice(0,500);save();
+  status.textContent="Pacote completo gerado e salvo no histórico com "+(d.model||"Gemini")+". Revise os dados antes de publicar.";
  }catch(e){
   status.textContent=e.name==="AbortError"?"A geração excedeu o limite de 95 segundos. O pedido foi encerrado; tente novamente.":(e.message||"Falha inesperada na geração.");
  }finally{if(button)button.disabled=false;}
@@ -150,7 +191,22 @@ function saveDiscoveryProduct(i){
  save();alert("Produto adicionado. Insira seu link de afiliado antes de divulgar.");
 }
 function render(){let m=db.metrics;["vClicks","rClicks"].forEach(id=>el(id).textContent=m.clicks||0);["vSales","rSales"].forEach(id=>el(id).textContent=m.sales||0);["vCommission","rCommission"].forEach(id=>el(id).textContent=fmt(m.commission));el("vProducts").textContent=db.products.length;el("rRate").textContent=(m.clicks?100*m.sales/m.clicks:0).toLocaleString("pt-BR",{maximumFractionDigits:1})+"%";el("clicks").value=m.clicks||0;el("sales").value=m.sales||0;el("commission").value=m.commission||0;el("period").value=m.period||"";renderProducts();renderAiProducts();renderDays();renderScripts();el("upcoming").innerHTML=themes.slice(0,4).map((t,i)=>'<div class="row"><div><b>Dia '+(i+1)+' · '+safe(t[0])+'</b><div class="muted">'+safe(t[1])+'</div></div><span class="pill">'+safe(db.calendar[i]||"Pendente")+'</span></div>').join("");let c=db.settings;el("brand").value=c.brand||"Vitrine Certa";el("social").value=c.social||"";el("defaultLink").value=c.defaultLink||"";el("notes").value=c.notes||""}
-function renderProducts(){let q=(el("search")?.value||"").toLowerCase(),f=el("filter")?.value||"";let a=db.products.map((p,i)=>({p,i})).filter(x=>(x.p.name+" "+x.p.category).toLowerCase().includes(q)&&(!f||x.p.platform===f));el("productRows").innerHTML=a.length?a.map(x=>'<tr><td><b>'+safe(x.p.name)+'</b><br><small>'+safe(x.p.notes)+'</small></td><td>'+safe(x.p.category)+'</td><td>'+safe(x.p.platform)+'</td><td>'+(x.p.price?fmt(x.p.price):"Pendente")+'</td><td>'+(x.p.link?'<a target="_blank" rel="noopener" href="'+safe(x.p.link)+'">Abrir link</a>':"Não cadastrado")+'</td><td><button class="btn" onclick="editProduct('+x.i+')">Editar</button> <button class="btn" onclick="removeProduct('+x.i+')">Excluir</button></td></tr>').join(""):'<tr><td colspan="6">Nenhum produto cadastrado.</td></tr>'}
+function productQuality(p){
+ let score=20,checks=[];
+ if(p.category)score+=10;else checks.push("categoria");
+ if(p.platform)score+=5;
+ if(Number(p.price)>0)score+=15;else checks.push("preço");
+ if(Number(p.rate)>0)score+=15;else checks.push("comissão");
+ if(/^https:\/\//i.test(p.link||""))score+=15;else checks.push("link afiliado");
+ if(p.notes&&p.notes.length>=12)score+=10;else checks.push("fonte/data");
+ if(p.verifiedAt)score+=10;
+ return {score:Math.min(100,score),checks};
+}
+function renderProducts(){
+ let q=(el("search")?.value||"").toLowerCase(),f=el("filter")?.value||"";
+ let a=db.products.map((p,i)=>({p,i,quality:productQuality(p)})).filter(x=>(x.p.name+" "+x.p.category).toLowerCase().includes(q)&&(!f||x.p.platform===f)).sort((x,y)=>y.quality.score-x.quality.score);
+ el("productRows").innerHTML=a.length?a.map(x=>'<tr><td><b>'+safe(x.p.name)+'</b><br><small>'+safe(x.p.notes)+'</small></td><td>'+safe(x.p.category)+'</td><td>'+safe(x.p.platform)+'</td><td>'+(x.p.price?fmt(x.p.price):"Pendente")+'</td><td><b>'+x.quality.score+'/100</b><br><small>'+safe(x.quality.checks.length?'Falta: '+x.quality.checks.join(', '):'Dados preenchidos; confira a fonte')+'</small></td><td>'+(x.p.link?'<a target="_blank" rel="noopener" href="'+safe(x.p.link)+'">Abrir link</a>':"Não cadastrado")+'</td><td><button class="btn" onclick="editProduct('+x.i+')">Editar</button> <button class="btn" onclick="removeProduct('+x.i+')">Excluir</button></td></tr>').join(""):'<tr><td colspan="7">Nenhum produto cadastrado.</td></tr>';
+}
 function renderDays(){el("days").innerHTML=themes.map((t,i)=>'<article class="day"><b>DIA '+(i+1)+'</b><h3>'+safe(t[0])+'</h3><p>'+safe(t[1])+'<br>'+safe(t[2])+'</p><select onchange="db.calendar['+i+']=this.value;save()"><option '+((db.calendar[i]||"Pendente")==="Pendente"?"selected":"")+'>Pendente</option><option '+(db.calendar[i]==="Em produção"?"selected":"")+'>Em produção</option><option '+(db.calendar[i]==="Publicado"?"selected":"")+' >Publicado</option></select></article>').join("")}
 function renderScripts(){el("scriptCards").innerHTML=scripts.map((s,i)=>'<article class="script"><span class="pill">'+safe(s[0])+'</span><p id="sc'+i+'">'+safe(s[1])+'</p><button class="btn" onclick="copyScript('+i+')">Copiar texto</button></article>').join("")}
 function newProduct(){editing=-1;el("modalTitle").textContent="Novo produto";["pName","pCategory","pPrice","pRate","pLink","pNotes"].forEach(id=>el(id).value="");el("pPlatform").value="Shopee";el("modal").classList.remove("hidden")}
@@ -191,4 +247,5 @@ if(el("dashboardToken"))el("dashboardToken").value=sessionStorage.getItem("vcDas
 checkConnections();
 checkGemini();
 render();
+loadDashboardState();
 </script></body></html>
