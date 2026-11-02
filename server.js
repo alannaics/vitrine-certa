@@ -627,9 +627,10 @@ app.put("/api/dashboard/state", requireDashboardToken, async (req, res) => {
   const state = req.body?.state;
   if (!state || typeof state !== "object" || Array.isArray(state)) return res.status(400).json({ error: "Estado do painel inválido." });
   if (!Array.isArray(state.products) || state.products.length > 2000) return res.status(400).json({ error: "Lista de produtos inválida ou acima do limite." });
+  if (state.metricEntries !== undefined && (!Array.isArray(state.metricEntries) || state.metricEntries.length > 5000)) return res.status(400).json({ error: "Histórico de resultados inválido ou acima do limite." });
   if (!state.metrics || typeof state.metrics !== "object" || !state.calendar || typeof state.calendar !== "object" || !state.settings || typeof state.settings !== "object") return res.status(400).json({ error: "Dados de resultados, calendário ou configurações inválidos." });
   try {
-    const payload = JSON.stringify({ products: state.products, metrics: state.metrics, calendar: state.calendar, settings: state.settings, campaigns: Array.isArray(state.campaigns) ? state.campaigns.slice(0, 500) : [], updatedAt: new Date().toISOString() });
+    const payload = JSON.stringify({ products: state.products, metrics: state.metrics, calendar: state.calendar, settings: state.settings, campaigns: Array.isArray(state.campaigns) ? state.campaigns.slice(0, 500) : [], metricEntries: Array.isArray(state.metricEntries) ? state.metricEntries.slice(0, 5000) : [], updatedAt: new Date().toISOString() });
     if (Buffer.byteLength(payload, "utf8") > 900000) return res.status(413).json({ error: "Os dados do painel excedem o limite permitido." });
     const result = await db.query("INSERT INTO dashboard_state (id, state, updated_at) VALUES (1, $1::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET state = EXCLUDED.state, updated_at = NOW() RETURNING updated_at", [payload]);
     return res.json({ saved: true, updatedAt: result.rows[0].updated_at });
