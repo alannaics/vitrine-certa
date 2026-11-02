@@ -362,7 +362,7 @@ function commercialOfferScore(p){
  const rating=Number(p.ratingStar??p.rating);
  if(Number.isFinite(rating)&&rating>0)parts.push({label:"Avaliação",points:rating>=4.8?20:rating>=4.5?16:rating>=4?12:6});
  const commission=Number(p.commissionRate??p.commission);
- if(Number.isFinite(commission)&&commission>0)parts.push({label:"Comissão informada",points:Math.min(20,Math.round(commission)));
+ if(Number.isFinite(commission)&&commission>0)parts.push({label:"Comissão informada",points:Math.min(20,Math.round(commission))});
  const price=Number(p.priceMin??p.price);
  if(Number.isFinite(price)&&price>0)parts.push({label:"Preço disponível",points:10});
  if(p.resultType==="active"||p.availabilityVerified===true)parts.push({label:"Anúncio/estoque confirmado",points:20});
