@@ -255,13 +255,13 @@ async function loadDailyPicks(force=false){
  status.textContent="Buscando anúncios mais vendidos nas categorias femininas...";
  cards.innerHTML="";chart.innerHTML="";
  try{
-  const r=await fetch("/api/daily-picks",{cache:"no-store"});
+  const r=await fetch("/api/daily-picks"+(force?"?refresh=1":""),{cache:"no-store"});
   const d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(d.error||"Falha ao consultar os produtos.");
   dailyPicksLoadedDate=d.date||"";
   el("dailyDate").textContent="Atualizado em "+new Date(d.updatedAt).toLocaleString("pt-BR")+" · "+d.date;
   el("dailyCount").textContent=(d.count||0)+" de 5 produtos";
-  status.textContent=d.count?"Seleção ordenada pela quantidade de vendas exibida nos anúncios.":"A consulta não retornou anúncios suficientes.";
+  status.textContent=d.count?(d.partial?"Seleção parcial: algumas categorias não responderam. Ranking ordenado pelas vendas exibidas.":"Seleção ordenada pela quantidade de vendas exibida nos anúncios."):"A consulta não retornou anúncios suficientes.";
   dailyPickItems=d.products||[];
   const max=Math.max(1,...dailyPickItems.map(p=>Number(p.soldQuantity)||0));
   chart.innerHTML=dailyPickItems.map(p=>'<div class="daily-bar"><strong>'+formatDailySales(p.soldQuantity)+'</strong><div class="daily-bar-fill" style="height:'+Math.max(5,Math.round((Number(p.soldQuantity)||0)/max*66))+'px"></div><small>#'+p.rank+'</small></div>').join("");
