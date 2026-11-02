@@ -255,7 +255,9 @@ async function searchMarketplaceProducts(platform){
   if(!r.ok)throw new Error(d.error||"A plataforma respondeu HTTP "+r.status+".");
   const items=shopee?(d.nodes||[]):(d.products||[]);
   if(!items.length){status.textContent="Nenhum produto com vendas informadas e critérios disponíveis foi encontrado. Tente outro termo.";return;}
-  status.textContent=items.length+" produtos com vendas informadas, ordenados do maior para o menor. "+(shopee?"A Shopee não informa estoque confiável nesta consulta; confirme no anúncio.":"Anúncios ativos e com estoque disponível foram validados pela API.");
+  status.textContent=shopee
+   ? items.length+" ofertas retornadas pela API de afiliados. Ordenadas pelas vendas quando esse dado existe; estoque precisa ser confirmado no anúncio."
+   : items.length+" resultados do catálogo. "+(d.verifiedCount||0)+" anúncios ativos com estoque confirmado; "+(d.catalogCount||0)+" produtos ainda precisam de validação no anúncio.";
   results.innerHTML=items.map((p,i)=>{
    const name=p.productName||p.title||p.name||"Produto sem título";
    const price=p.priceMin??p.price??p.price_max??null;
@@ -268,7 +270,7 @@ async function searchMarketplaceProducts(platform){
    return '<article class="discovery-card">'+(image?'<img src="'+safe(image)+'" alt="" style="width:100%;height:145px;object-fit:contain;border-radius:10px;background:#fff7fa">':'')+
     '<h3>'+safe(name)+'</h3><div class="daily-product-price">'+(price!==null?"R$ "+Number(price).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"Preço não informado")+'</div>'+
     '<div class="discovery-meta">'+(rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+' · '+(sold!==null?"Vendas informadas: "+safe(sold):"Vendas não informadas")+'</div>'+
-    '<div class="discovery-meta">'+(shopee?"Estoque: não confirmado pela API":(stock!==null?"Estoque disponível: "+safe(stock):"Estoque não informado"))+'</div>'+
+    '<div class="discovery-meta">'+(shopee?"Estoque: não confirmado pela API":(p.availabilityVerified?"Estoque confirmado: "+safe(stock):"Disponibilidade não confirmada — abra os anúncios"))+'</div>'+
     '<div class="discovery-meta">'+(commission!==null?"Comissão retornada: "+safe(commission):"Comissão não disponível nesta consulta")+'</div>'+
     '<div class="toolbar">'+(href?'<a class="btn" href="'+safe(href)+'" target="_blank" rel="noopener">Abrir produto</a>':'')+
     '<button class="btn primary" onclick="saveMarketplaceProduct('+JSON.stringify(platform)+','+i+')">Salvar no catálogo</button></div></article>';
