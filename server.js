@@ -324,7 +324,7 @@ app.get("/api/mercadolivre/me", requireDashboardToken, async (_req, res) => {
 });
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.Gemini_API_Key;
-app.get("/api/gemini/status", async (_req, res) => {
+app.get("/api/gemini/status", requireDashboardToken, async (_req, res) => {
   if (!GEMINI_API_KEY) return res.status(503).json({ configured: false, valid: false, error: "Chave Gemini ausente no Render." });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
