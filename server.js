@@ -373,7 +373,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
       "Link de afiliado: " + (link || "não informado"),
       "Informações adicionais verificadas: " + (details || "nenhuma")
     ].join("\n");
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent";
     const requestBody = JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 3200, thinkingConfig: { thinkingLevel: "low" } }
@@ -381,7 +381,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
     let response, data = {};
     for (let attempt = 0; attempt < 3; attempt++) {
       const controller = new AbortController();
-      const requestTimeout = setTimeout(() => controller.abort(), 50000);
+      const requestTimeout = setTimeout(() => controller.abort(), 70000);
       try {
         response = await fetch(endpoint, {
           method: "POST",
@@ -392,7 +392,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
         data = await response.json().catch(() => ({}));
       } catch (error) {
         if (error.name === "AbortError") {
-          return res.status(504).json({ error: "O Gemini não respondeu em 50 segundos. A solicitação foi encerrada; tente novamente." });
+          return res.status(504).json({ error: "O Gemini não respondeu em 70 segundos. A solicitação foi encerrada; tente novamente." });
         }
         throw error;
       } finally { clearTimeout(requestTimeout); }
@@ -409,7 +409,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
     }
     const text = (data.candidates || []).flatMap(c => c.content?.parts || []).map(p => p.text || "").join("\n").trim();
     if (!text) return res.status(502).json({ error: "O Gemini não retornou texto. Tente novamente." });
-    res.json({ text, model: "gemini-3.8-flash" });
+    res.json({ text, model: "gemini-3.1-flash-lite-preview" });
   } catch (e) { console.error("Gemini generation failed:", e); res.status(502).json({ error: "Falha na comunicação com o serviço de IA: " + (e.message || "erro desconhecido") }); }
 });
 
