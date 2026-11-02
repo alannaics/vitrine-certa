@@ -324,7 +324,27 @@ app.get("/api/mercadolivre/me", requireDashboardToken, async (_req, res) => {
 });
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.Gemini_API_Key;
-app.get("/api/gemini/status", (_req, res) => res.json({ configured: Boolean(GEMINI_API_KEY) }));
+app.get("/api/gemini/status", async (_req, res) => {
+  if (!GEMINI_API_KEY) return res.status(503).json({ configured: false, valid: false, error: "Chave Gemini ausente no Render." });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+      headers: { "x-goog-api-key": GEMINI_API_KEY },
+      signal: controller.signal
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error("[Gemini status]", response.status, body.error?.message || "Google API error");
+      return res.status(502).json({ configured: true, valid: false, googleStatus: response.status, error: body.error?.message || "Google API recusou a chave." });
+    }
+    const models = (body.models || []).map(model => model.name).filter(name => /gemini/i.test(name));
+    return res.json({ configured: true, valid: true, reachable: true, geminiModelsAvailable: models.length, models: models.slice(0, 12) });
+  } catch (error) {
+    console.error("[Gemini status]", error.name, error.message);
+    return res.status(504).json({ configured: true, valid: false, reachable: false, error: error.name === "AbortError" ? "Tempo esgotado ao conectar ao Google." : error.message });
+  } finally { clearTimeout(timer); }
+});
 app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
   try {
     if (!GEMINI_API_KEY) return res.status(503).json({ error: "Configure GEMINI_API_KEY (ou Gemini_API_Key) no Render." });
