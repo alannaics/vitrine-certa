@@ -239,19 +239,32 @@ const femaleSearches = [
 function brazilDateKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
-app.get("/api/daily-picks", async (_req, res) => {
+app.get("/api/daily-picks", async (req, res) => {
   const dateKey = brazilDateKey();
   const cached = dailyPicksCache.get(dateKey);
-  if (_req.query.refresh !== "1" && cached && Date.now() - cached.createdAt < 20 * 60 * 60 * 1000) {
+  if (req.query.refresh !== "1" && cached && Date.now() - cached.createdAt < 20 * 60 * 60 * 1000) {
     return res.json({ ...cached.payload, cached: true });
   }
   try {
-    const batches = await Promise.all(femaleSearches.map(async group => {
+    // A API de busca pode bloquear chamadas anônimas originadas de servidores cloud.
+    // Usamos a sessão OAuth já conectada ao Mercado Livre e um User-Agent identificável.
+    const token = await ensureMlToken();
+    const batches = await Promise.allSettled(femaleSearches.map(async group => {
       const url = new URL("https://api.mercadolibre.com/sites/MLB/search");
-      url.search = new URLSearchParams({ q: group.keyword, sort: "sold_quantity_desc", limit: "20" }).toString();
-      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      url.search = new URLSearchParams({ q: group.keyword, sort: "sold_quantity_desc", limit: "30" }).toString();
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          Authorization: "Bearer " + token,
+          "User-Agent": "VitrineCerta/1.0 (product discovery)"
+        }
+      });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error("Mercado Livre (" + group.category + ") respondeu HTTP " + response.status);
+      if (!response.ok) {
+        const error = new Error("Mercado Livre (" + group.category + ") respondeu HTTP " + response.status);
+        error.status = response.status;
+        throw error;
+      }
       return (data.results || []).map(item => ({
         id: String(item.id), title: String(item.title || ""), price: Number(item.price) || null,
         currency: item.currency_id || "BRL", soldQuantity: Number(item.sold_quantity) || 0,
@@ -259,11 +272,25 @@ app.get("/api/daily-picks", async (_req, res) => {
         permalink: String(item.permalink || ""), thumbnail: String(item.thumbnail || "").replace("-I.jpg", "-W.jpg"),
         sellerId: item.seller?.id || null, category: group.category,
         condition: item.condition || null, shippingFree: Boolean(item.shipping?.free_shipping),
-        platform: "Mercado Livre", source: "API pública de busca do Mercado Livre"
+        platform: "Mercado Livre", source: "API oficial de busca do Mercado Livre"
       }));
     }));
+    const successful = batches.filter(x => x.status === "fulfilled").flatMap(x => x.value);
+    const failedCategories = batches.map((x,i) => x.status === "rejected" ? {
+      category: femaleSearches[i].category,
+      status: x.reason?.status || null,
+      message: x.reason?.message || "Falha na consulta"
+    } : null).filter(Boolean);
+    if (!successful.length) {
+      const authFailure = failedCategories.find(x => x.status === 401 || x.status === 403);
+      const error = new Error(authFailure
+        ? "O Mercado Livre recusou a consulta autenticada (HTTP " + authFailure.status + "). Verifique a conexão da conta em Configurações."
+        : "Nenhuma categoria retornou anúncios nesta atualização.");
+      error.status = authFailure?.status || 502;
+      throw error;
+    }
     const unique = new Map();
-    batches.flat().forEach(item => {
+    successful.forEach(item => {
       if (!item.id || !item.title || !item.permalink) return;
       const previous = unique.get(item.id);
       if (!previous || item.soldQuantity > previous.soldQuantity) unique.set(item.id, item);
@@ -272,15 +299,18 @@ app.get("/api/daily-picks", async (_req, res) => {
       .map((item,index) => ({ ...item, rank: index + 1 }));
     const payload = {
       date: dateKey, updatedAt: new Date().toISOString(), count: ranked.length,
-      products: ranked,
-      source: "Mercado Livre — API pública de busca, consultas em categorias de interesse feminino, ordenadas por sold_quantity_desc",
-      methodology: "Cinco anúncios com maior quantidade de vendas exibida entre as buscas consultadas. O campo sold_quantity pode ser apresentado em faixas referenciais pela plataforma; não representa vendas do dia nem garante conversão."
+      products: ranked, partial: failedCategories.length > 0, failedCategories,
+      source: "Mercado Livre — API oficial de busca autenticada; categorias de interesse feminino ordenadas por sold_quantity_desc",
+      methodology: "Até cinco anúncios com maior quantidade de vendas exibida entre as categorias consultadas. O campo sold_quantity pode ser apresentado em faixas referenciais; não representa vendas do dia nem garante conversão."
     };
     dailyPicksCache.set(dateKey, { createdAt: Date.now(), payload });
     res.json(payload);
   } catch (error) {
     console.error("[daily-picks]", error.message);
-    res.status(502).json({ error: "Não foi possível atualizar os cinco produtos de hoje. " + error.message });
+    res.status(error.status === 401 || error.status === 403 ? error.status : 502).json({
+      error: error.message,
+      action: "Verifique se a conta do Mercado Livre está conectada em Configurações e tente atualizar novamente."
+    });
   }
 });
 
