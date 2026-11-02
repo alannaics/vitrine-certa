@@ -229,53 +229,26 @@ app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
 
 app.get("/api/mercadolivre/discovery", async (_req, res) => {
   try {
-    // Usa o recurso oficial /trends, evitando /sites/MLB/search que pode retornar 403.
     const token = await ensureMlToken();
-    const response = await fetch("https://api.mercadolibre.com/trends/MLB", {
-      headers: { Authorization: "Bearer " + token, Accept: "application/json" }
-    });
+    const response = await fetch("https://api.mercadolibre.com/trends/MLB", { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
     const data = await response.json().catch(() => []);
-    if (!response.ok) {
-      const message = data.message || data.error || "Falha ao consultar tendências oficiais do Mercado Livre (HTTP " + response.status + ").";
-      const error = new Error(message);
-      error.status = response.status;
-      throw error;
-    }
-    const femaleTerms = /feminin|mulher|maquiagem|skincare|beleza|bolsa|biqu[ií]ni|legging|academia|cabelo|unha|organizador|cozinha|decora[cç][aã]o|casa|tenis|sapato|sand[aá]lia|vestido|blusa|cal[cç]a|perfume|escova|secador|chapinha|joia|biju|acess[oó]rio|celular|fone|smartwatch/i;
-    const trends = (Array.isArray(data) ? data : [])
-      .map((item, index) => ({
-        keyword: String(item.keyword || "").trim(),
-        url: String(item.url || ""),
-        trendType: index < 10 ? "Crescimento" : index < 30 ? "Mais buscado" : "Popular"
-      }))
-      .filter(item => item.keyword && femaleTerms.test(item.keyword))
-      .slice(0, 5)
-      .map((item, index) => ({
-        id: "trend-" + index + "-" + Buffer.from(item.keyword).toString("base64url").slice(0, 12),
-        title: item.keyword,
-        price: null,
-        permalink: item.url || "https://lista.mercadolivre.com.br/" + encodeURIComponent(item.keyword),
-        thumbnail: null,
-        category: "Tendência de busca",
-        soldQuantity: null,
-        freeShipping: false,
-        score: null,
-        trendType: item.trendType,
-        isTrend: true
-      }));
-    res.json({
-      products: trends,
-      updatedAt: new Date().toISOString(),
-      source: "API oficial de Tendências do Mercado Livre",
-      note: "Tendências de busca atualizadas semanalmente. Não são anúncios de produtos: preço, vendedor, estoque e comissão precisam ser conferidos ao abrir os resultados."
-    });
-  } catch (e) {
-    const status = e.status === 401 ? 401 : e.status === 403 ? 403 : 502;
-    res.status(status).json({
-      error: status === 401
-        ? "A autorização do Mercado Livre expirou ou não está ativa neste servidor. Reconecte a conta em Configurações."
-        : e.message || "Falha no garimpo de tendências do Mercado Livre."
-    });
+    if (!response.ok) { const error = new Error(data.message || data.error || "Falha ao consultar tendências oficiais do Mercado Livre (HTTP " + response.status + ")."); error.status = response.status; throw error; }
+    const classify = keyword => {
+      const k=keyword.toLowerCase();
+      if(/maquiagem|skincare|beleza|cabelo|unha|perfume|escova|secador|chapinha/.test(k))return "Beleza";
+      if(/bolsa|biqu[ií]ni|legging|academia|tenis|sapato|sand[aá]lia|vestido|blusa|cal[cç]a|joia|biju|acess[oó]rio/.test(k))return "Moda e acessórios";
+      if(/organizador|cozinha|decora[cç][aã]o|casa|pote|lumin[aá]ria/.test(k))return "Casa e organização";
+      if(/celular|fone|smartwatch|tablet|notebook/.test(k))return "Tecnologia";
+      return "Interesse feminino";
+    };
+    const femaleTerms=/feminin|mulher|maquiagem|skincare|beleza|bolsa|biqu[ií]ni|legging|academia|cabelo|unha|organizador|cozinha|decora[cç][aã]o|casa|tenis|sapato|sand[aá]lia|vestido|blusa|cal[cç]a|perfume|escova|secador|chapinha|joia|biju|acess[oó]rio|celular|fone|smartwatch/i;
+    const trends=(Array.isArray(data)?data:[]).map((item,index)=>({keyword:String(item.keyword||"").trim(),url:String(item.url||""),trendRank:index+1,trendScore:Math.max(50,100-Math.round(index*1.5))}))
+      .filter(item=>item.keyword&&femaleTerms.test(item.keyword)).slice(0,15)
+      .map(item=>({id:"trend-"+item.trendRank+"-"+Buffer.from(item.keyword).toString("base64url").slice(0,12),title:item.keyword,price:null,permalink:item.url||"https://lista.mercadolivre.com.br/"+encodeURIComponent(item.keyword),thumbnail:null,category:classify(item.keyword),trendRank:item.trendRank,trendScore:item.trendScore,trendType:item.trendRank<=10?"Top 10":item.trendRank<=30?"Top 30":"Popular",sourceType:"mercadolivre_weekly_trend",isTrend:true}));
+    res.json({products:trends,updatedAt:new Date().toISOString(),source:"API oficial de Tendências do Mercado Livre",scoring:"Índice calculado somente pela posição do termo na lista recebida; não representa volume, crescimento, vendas ou conversão.",note:"Tendências são sinais para pesquisa, não anúncios de produtos."});
+  } catch(e) {
+    const status=e.status===401?401:e.status===403?403:502;
+    res.status(status).json({error:status===401?"A autorização do Mercado Livre expirou ou não está ativa neste servidor. Reconecte a conta em Configurações.":e.message||"Falha no garimpo de tendências do Mercado Livre."});
   }
 });
 
