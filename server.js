@@ -352,7 +352,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
       "Preço informado: " + (price || "não informado"),
       "Link de afiliado: " + (link || "não informado"),
       "Informações adicionais verificadas: " + (details || "nenhuma")
-    ].join("\\n");
+    ].join("\n");
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
