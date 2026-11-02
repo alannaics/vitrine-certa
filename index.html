@@ -191,7 +191,8 @@ async function loadDashboardState(){
  }
 }
 function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));let n={home:"Visão geral",products:"Produtos",discovery:"Inteligência de produtos",calendar:"Plano de 30 dias",scripts:"Conteúdos prontos",results:"Resultados",settings:"Configurações"};el("title").textContent=n[id]}
-el("nav").onclick=e=>{let b=e.target.closest("button[data-page]");if(b)showPage(b.dataset.page)};
+el("nav").onclick=e=>{let b=e.target.closest("button[data-page]");if(b){e.preventDefault();showPage(b.dataset.page)}};
+document.querySelectorAll("#nav button[data-page]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
 function renderAiProducts(){const sel=el("aiProduct");if(!sel)return;const old=sel.value;sel.innerHTML=db.products.map((p,i)=>"<option value=\""+i+"\">"+safe(p.name)+"</option>").join("");if(old&&Number(old)<db.products.length)sel.value=old;}
 async function checkGemini(){
  const status=el("aiStatus");if(!status)return;
@@ -371,7 +372,7 @@ async function runDiscovery(){
   if(!r.ok)throw new Error(d.error||"Não foi possível consultar tendências oficiais.");
   discoveryItems=(d.products||[]).slice().sort((a,b)=>Number(a.trendRank)-Number(b.trendRank));
   if(!discoveryItems.length){status.textContent="O ranking oficial não retornou termos nesta atualização.";return;}
-  const card=(p,i,market)=>'<article class="discovery-card"><div class="notice">Ranking oficial · posição #'+p.trendRank+'</div><span class="pill">'+safe(p.category||"Tendência")+'</span><h3>'+safe(p.title)+'</h3><div class="discovery-meta">Posição '+p.trendRank+' na lista oficial. Não representa volume de buscas nem vendas.</div><div class="toolbar"><a class="btn" target="_blank" rel="noopener" href="'+(market==="shopee"?'https://shopee.com.br/search?keyword=':'https://lista.mercadolivre.com.br/')+encodeURIComponent(p.title)+'">Pesquisar na '+(market==="shopee"?"Shopee":"Mercado Livre")+'</a><button class="btn primary" onclick="searchTrendOffers(decodeURIComponent(''+encodeURIComponent(p.title)+''))">Pesquisar ofertas</button></div></article>';
+  const card=(p,i,market)=>'<article class="discovery-card"><div class="notice">Ranking oficial · posição #'+p.trendRank+'</div><span class="pill">'+safe(p.category||"Tendência")+'</span><h3>'+safe(p.title)+'</h3><div class="discovery-meta">Posição '+p.trendRank+' na lista oficial. Não representa volume de buscas nem vendas.</div><div class="toolbar"><a class="btn" target="_blank" rel="noopener" href="'+(market==="shopee"?'https://shopee.com.br/search?keyword=':'https://lista.mercadolivre.com.br/')+encodeURIComponent(p.title)+'">Pesquisar na '+(market==="shopee"?"Shopee":"Mercado Livre")+'</a><button class="btn primary" data-trend-query="'+safe(p.title)+'" onclick="searchTrendOffers(this.dataset.trendQuery)">Pesquisar ofertas</button></div></article>';
   el("shopeeTrendResults").innerHTML=discoveryItems.map((p,i)=>card(p,i,"shopee")).join("");
   el("mlTrendResults").innerHTML=discoveryItems.map((p,i)=>card(p,i,"ml")).join("");
   status.textContent=discoveryItems.length+" pesquisas prioritárias carregadas. Fonte: "+(d.source||"Mercado Livre")+". Atualizado em "+new Date(d.updatedAt).toLocaleString("pt-BR")+".";
