@@ -259,7 +259,7 @@ async function generateWithGemini(){
   if(!r.ok)throw new Error(d.error||"Erro HTTP "+r.status+" ao gerar a campanha.");
   if(!d.text)throw new Error("O serviço de IA respondeu sem conteúdo. Tente novamente.");
   out.value=d.text;
-  db.campaigns.unshift({id:"campaign-"+Date.now(),product:p.name,format:el("aiFormat").value,text:d.text,createdAt:new Date().toISOString()});
+  db.campaigns.unshift({id:"campaign-"+Date.now(),product:p.name,productPlatform:p.platform||"",productKey:p.sourceId||p.offerId||p.catalogId||"",productLink:p.link||"",format:el("aiFormat").value,text:d.text,createdAt:new Date().toISOString()});
   db.campaigns=db.campaigns.slice(0,500);save();
   status.textContent="Pacote completo gerado e salvo no histórico com "+(d.model||"Gemini")+". Revise os dados antes de publicar.";
  }catch(e){
@@ -469,7 +469,7 @@ function renderScripts(){el("scriptCards").innerHTML=scripts.map((s,i)=>'<articl
 function renderCampaignHistory(){
  const target=el("campaignHistory");if(!target)return;
  const items=Array.isArray(db.campaigns)?db.campaigns:[];
- target.innerHTML=items.length?items.map((c,i)=>'<article class="script"><span class="pill">'+safe(c.format||"Campanha")+'</span><h3>'+safe(c.product||"Produto")+'</h3><p>'+safe((c.text||"").slice(0,280))+(String(c.text||"").length>280?"…":"")+'</p><div class="muted">'+(c.createdAt?new Date(c.createdAt).toLocaleString("pt-BR"):"Data não informada")+'</div><button class="btn" onclick="openCampaign('+i+')">Abrir no editor</button></article>').join(""):'<p class="muted">Nenhuma campanha salva ainda. Gere um pacote com o Gemini para começar seu histórico.</p>';
+ target.innerHTML=items.length?items.map((c,i)=>'<article class="script"><span class="pill">'+safe(c.format||"Campanha")+(c.productPlatform?" · "+safe(c.productPlatform):"")+'</span><h3>'+safe(c.product||"Produto")+'</h3><p>'+safe((c.text||"").slice(0,280))+(String(c.text||"").length>280?"…":"")+'</p><div class="muted">'+(c.createdAt?new Date(c.createdAt).toLocaleString("pt-BR"):"Data não informada")+'</div><button class="btn" onclick="openCampaign('+i+')">Abrir no editor</button></article>').join(""):'<p class="muted">Nenhuma campanha salva ainda. Gere um pacote com o Gemini para começar seu histórico.</p>';
 }
 function openCampaign(i){
  const c=db.campaigns[i];if(!c)return;
