@@ -203,9 +203,17 @@ app.get("/api/shopee/products", requireDashboardToken, async (req, res) => {
     const data = await shopeeRequest(query);
     const result = data?.productOfferV2 || { nodes: [], pageInfo: {} };
     const nodes = (result.nodes || [])
-      .filter(item => Number(item.sales || 0) > 0)
-      .sort((a, b) => Number(b.sales || 0) - Number(a.sales || 0));
-    res.json({ ...result, nodes, ranking: "Produtos com vendas informadas, ordenados por sales decrescente.", availabilityVerified: false,
+      .slice()
+      .sort((a, b) => {
+        const salesA = Number(a.sales);
+        const salesB = Number(b.sales);
+        if (Number.isFinite(salesA) && Number.isFinite(salesB)) return salesB - salesA;
+        if (Number.isFinite(salesA)) return -1;
+        if (Number.isFinite(salesB)) return 1;
+        return 0;
+      });
+    res.json({ ...result, nodes, ranking: "Produtos ordenados pelas vendas informadas pela API; itens sem dado de vendas aparecem depois.",
+      availabilityVerified: false,
       availabilityNote: "A API de ofertas consultada não fornece um campo confiável de estoque nesta consulta; confirme a disponibilidade na página do produto." });
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
