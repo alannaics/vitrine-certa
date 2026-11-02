@@ -244,11 +244,7 @@ async function generateWithGemini(){
 function copyAiOutput(){const t=el("aiOutput").value;if(!t){alert("Gere um conteúdo primeiro.");return;}navigator.clipboard.writeText(t).then(()=>alert("Conteúdo copiado.")).catch(()=>{el("aiOutput").select();document.execCommand("copy");alert("Conteúdo copiado.");});}
 
 
-let dailyPickItems=[];
-let dailyPicksLoadedDate="";
 function formatDailySales(value){return Number(value||0).toLocaleString("pt-BR");}
-let dailyPickItems=[];
-let dailyPicksLoadedDate="";
 async function loadDailyPicks(force=false){
  const status=el("dailyPicksStatus"),button=el("refreshDailyPicks"),cards=el("dailyPicksResults"),chart=el("dailyPicksChart");
  if(!status||!cards)return;
