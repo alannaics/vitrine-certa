@@ -69,6 +69,13 @@ td,th{padding:14px 13px}th{background:#fff7fa}
 <section class="page" id="products"><h2>Banco de produtos</h2><p class="muted">O score combina sinais informados no cadastro e posição em tendências oficiais. Não prevê vendas nem substitui a conferência do anúncio.</p><div class="toolbar"><input class="field" id="search" placeholder="Buscar..." style="max-width:240px" oninput="renderProducts()"><select class="field" id="filter" style="max-width:190px" onchange="renderProducts()"><option value="">Todas as plataformas</option><option>Shopee</option><option>Mercado Livre</option></select><select class="field" id="stageFilter" style="max-width:220px" onchange="renderProducts()"><option value="">Todas as etapas</option><option value="Termo para pesquisar">Termo para pesquisar</option><option value="Anúncio encontrado">Anúncio encontrado</option><option value="Dados conferidos">Dados conferidos</option><option value="Pronto para divulgar">Pronto para divulgar</option></select><button class="btn primary" onclick="newProduct()">Adicionar</button></div><div class="tablewrap"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Plataforma</th><th>Preço</th><th>Validação</th><th>Score preliminar</th><th>Link afiliado</th><th></th></tr></thead><tbody id="productRows"></tbody></table></div></section>
 <section class="page" id="discovery">
 <div class="home-hero"><div><div class="eyebrow">RADAR DE PESQUISAS RANQUEADAS</div><h2>Descubra o que as pessoas estão procurando</h2><p class="muted">Termos selecionados pela posição no ranking oficial de tendências do Mercado Livre. Use-os como ponto de partida para pesquisar ofertas em cada marketplace.</p></div><button class="btn primary" id="runDiscovery" onclick="runDiscovery()">Atualizar pesquisas</button></div>
+<div class="card" style="margin:14px 0">
+ <div class="eyebrow">BUSCA DE PRODUTOS</div><h2>Pesquise qualquer produto ou palavra-chave</h2>
+ <p class="muted">Digite um produto, marca ou termo. A Vitrine Certa consulta as fontes disponíveis e lista os resultados, separando anúncios confirmados de itens encontrados apenas no catálogo.</p>
+ <div class="toolbar"><input class="field" id="discoveryProductQuery" placeholder="Ex.: fone bluetooth, air fryer, cadeira gamer..." style="flex:1;min-width:220px"><select class="field" id="discoveryMarketplace" style="max-width:190px"><option value="both">Shopee + Mercado Livre</option><option value="shopee">Somente Shopee</option><option value="ml">Somente Mercado Livre</option></select><button class="btn primary" id="searchDiscoveryProducts" onclick="searchDiscoveryProducts()">Buscar produtos</button></div>
+ <div id="discoveryProductStatus" class="muted">A busca pode funcionar com palavras-chave mesmo quando não há ranking de vendas disponível.</div>
+ <div id="discoveryProductResults" class="grid content" style="margin-top:12px"></div>
+</div>
 <div class="notice">Importante: o ranking abaixo é de tendências de busca, não um ranking de produtos vendidos. A Shopee não fornece uma classificação própria nesta integração; os mesmos termos são usados como sugestões de pesquisa, sem atribuir à Shopee um ranking que não foi consultado.</div>
 <div class="grid two" style="margin-top:14px">
  <div class="card"><div class="eyebrow">MARKETPLACE 01</div><h2>Shopee · Pesquisas prioritárias</h2><p class="muted">Abra cada termo na Shopee e compare os anúncios, avaliações e disponibilidade.</p><div id="shopeeTrendResults" class="grid content"></div></div>
@@ -286,6 +293,53 @@ function saveMarketplaceProduct(platform,index){
  const exists=db.products.some(x=>x.sourceId===item.sourceId&&x.platform===item.platform);
  if(exists){alert("Este produto já está no catálogo.");return;}
  db.products.unshift(item);save();alert("Produto salvo no catálogo. Confira os dados e complete o link de afiliado, se necessário.");
+}
+async function searchDiscoveryProducts(){
+ const query=(el("discoveryProductQuery")?.value||"").trim();
+ const market=el("discoveryMarketplace")?.value||"both";
+ const status=el("discoveryProductStatus"),results=el("discoveryProductResults"),button=el("searchDiscoveryProducts");
+ if(!query){status.textContent="Digite um produto ou palavra-chave para pesquisar.";return;}
+ button.disabled=true;results.innerHTML="";status.textContent="Pesquisando \""+query+"\" nas fontes selecionadas...";
+ const jobs=[];
+ if(market==="both"||market==="ml")jobs.push((async()=>{
+  try{
+   const r=await fetch("/api/mercadolivre/products?q="+encodeURIComponent(query),{cache:"no-store"});
+   const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Mercado Livre HTTP "+r.status);
+   return {market:"Mercado Livre",items:[...(d.products||[]).map(p=>({...p,resultType:"active"})),...(d.catalogProducts||[]).map(p=>({...p,resultType:"catalog"}))],error:null};
+  }catch(e){return {market:"Mercado Livre",items:[],error:e.message};}
+ })());
+ if(market==="both"||market==="shopee")jobs.push((async()=>{
+  try{
+   const token=el("dashboardToken")?.value.trim()||sessionStorage.getItem("vcDashboardToken")||"";
+   const r=await fetch("/api/shopee/products?keyword="+encodeURIComponent(query)+"&limit=20",{cache:"no-store",headers:{"x-dashboard-token":token}});
+   const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Shopee HTTP "+r.status);
+   return {market:"Shopee",items:(d.nodes||[]).map(p=>({...p,resultType:"offer"})),error:null};
+  }catch(e){return {market:"Shopee",items:[],error:e.message};}
+ })());
+ try{
+  const groups=await Promise.all(jobs);const all=groups.flatMap(g=>g.items);
+  window.discoveryProductResults=all;
+  const cards=groups.flatMap(g=>g.items.map(p=>{
+   const name=p.productName||p.title||p.name||"Produto sem título";
+   const price=p.priceMin??p.price??null;
+   const image=p.imageUrl||p.thumbnail||"";
+   const link=p.offerLink||p.productLink||p.permalink||"";
+   const sales=p.sales??p.sold_quantity;
+   const rating=p.ratingStar??p.rating;
+   const commission=p.commissionRate??p.commissionRate??p.commission;
+   const state=p.resultType==="active"?"Anúncio ativo · estoque confirmado":p.resultType==="catalog"?"Resultado de catálogo · anúncio/estoque não confirmados":"Oferta retornada pela API de afiliados";
+   return '<article class="discovery-card">'+(image?'<img src="'+safe(image)+'" alt="" style="width:100%;height:145px;object-fit:contain;border-radius:10px;background:#fff7fa">':'')+
+    '<span class="pill">'+safe(g.market)+' · '+state+'</span><h3>'+safe(name)+'</h3>'+
+    '<div class="discovery-meta">'+(price!==null?"Preço informado: R$ "+Number(price).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"Preço não informado")+'</div>'+
+    '<div class="discovery-meta">'+(sales!==undefined&&sales!==null?"Vendas informadas: "+safe(sales):"Vendas não informadas")+' · '+(rating!==undefined&&rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+'</div>'+
+    '<div class="discovery-meta">'+(commission!==undefined&&commission!==null?"Comissão informada: "+safe(commission):"Comissão não informada")+'</div>'+
+    '<div class="toolbar">'+(link?'<a class="btn" href="'+safe(link)+'" target="_blank" rel="noopener">Abrir resultado</a>':'')+'</div></article>';
+  }));
+  results.innerHTML=cards.join("");
+  const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);
+  status.textContent=all.length+" resultado(s) listado(s) para \""+query+"\". "+groups.filter(g=>g.items.length).map(g=>g.market+": "+g.items.length).join(" · ")+(errors.length?" | Indisponível: "+errors.join(" | "):"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
+ }catch(e){status.textContent=e.message;}
+ finally{button.disabled=false;}
 }
 let discoveryItems=[];
 async function runDiscovery(){
