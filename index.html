@@ -324,7 +324,7 @@ async function searchDiscoveryProducts(){
   }catch(e){return {market:"Shopee",items:[],error:e.message};}
  })());
  try{
-  const groups=await Promise.all(jobs);const all=groups.flatMap(g=>g.items);
+  const groups=await Promise.all(jobs);const all=groups.flatMap(g=>g.items.map(p=>({...p,_market:g.market})));
   window.discoveryProductResults=all;
   const cards=groups.flatMap(g=>g.items.map(p=>{
    const name=p.productName||p.title||p.name||"Produto sem título";
@@ -352,7 +352,7 @@ async function searchDiscoveryProducts(){
 }
 function saveDiscoveryProduct(index){
  const p=(window.discoveryProductResults||[])[index];if(!p)return;
- const platform=p.shopName||p.itemId||p.offerLink||p.productLink?"Shopee":"Mercado Livre";
+ const platform=p._market==="Shopee"?"Shopee":"Mercado Livre";
  const name=p.productName||p.title||p.name||"Produto";
  const sourceId=String(p.itemId||p.id||p.catalogId||p.productId||p.offerLink||p.permalink||platform+"-"+Date.now());
  const item={name,category:p.category||"Não informada",platform,price:String(p.priceMin??p.price??""),rate:String(p.commissionRate??p.commission??""),link:p.offerLink||p.productLink||p.permalink||"",rating:String(p.ratingStar??p.rating??""),soldQuantity:String(p.sales??p.sold_quantity??""),freeShipping:p.shipping?.free_shipping?"yes":"",stage:p.resultType==="active"?"Anúncio ativo":p.resultType==="catalog"?"Catálogo · vendedor não confirmado":"Oferta encontrada",verifiedAt:new Date().toISOString().slice(0,10),notes:[p.shopName||p.sellerName?"Vendedor: "+(p.shopName||p.sellerName):"",p.offerLink?"Link de oferta retornado pela API.":p.permalink?"Link comum do produto; ainda não é link de afiliado.":"Link não informado.",p.resultType==="catalog"?"A API retornou item de catálogo, sem confirmar vendedor/estoque.":""].filter(Boolean).join(" "),sourceId};
