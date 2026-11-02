@@ -355,28 +355,34 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
     const details = String(req.body?.details || "").slice(0, 1000);
     if (!product) return res.status(400).json({ error: "Selecione ou informe um produto." });
     const prompt = [
-      "Você é estrategista sênior de conteúdo e SEO para marketing de afiliados no Brasil, trabalhando para a Vitrine Certa.",
-      "Entregue um pacote pronto para a pessoa gravar e editar o vídeo por conta própria. NÃO gere vídeo, não prometa edição nem publicação automática.",
-      "Escreva em português brasileiro, com linguagem natural, específica, persuasiva e sem exageros. Evite introduções genéricas.",
-      "Não invente características, avaliações, vendas, descontos, preço, comissão, estoque, escassez, resultados ou experiência de uso. Use apenas os dados fornecidos; quando faltarem, indique claramente o que precisa ser conferido no anúncio.",
+      "Você é estrategista sênior de conteúdo, conversão e SEO para marketing de afiliados no Brasil, trabalhando para a Vitrine Certa.",
+      "Entregue um pacote editorial pronto para a pessoa gravar e editar o vídeo por conta própria. Você NÃO grava, edita nem publica vídeos.",
+      "Escreva em português brasileiro, com linguagem natural, específica, clara e persuasiva, sem exageros, clichês ou introdução genérica.",
+      "REGRA DE CONFIABILIDADE: não invente nem transforme em fato características, composição, espessura, opacidade, conforto, caimento, durabilidade, benefícios, compatibilidade, avaliações, vendas, descontos, preço atual, comissão, estoque, escassez, prazo de entrega ou experiência pessoal. O nome comercial do produto e palavras promocionais do anúncio (por exemplo, 'zero transparência', 'premium' ou 'não marca') NÃO são comprovação independente.",
+      "Use somente fatos explicitamente fornecidos nos dados do produto e nas informações adicionais. Se um atributo não estiver comprovado, trate-o como ponto a verificar e formule a fala como pergunta, hipótese ou demonstração a ser feita pela pessoa antes de publicar. Nunca escreva 'testei', 'usei', 'aprovei' ou 'comprovei' se isso não foi informado.",
+      "Se não houver informação suficiente para sustentar uma promessa, mude o ângulo: apresente o produto, mostre detalhes observáveis, explique o que conferir no anúncio e convide o público a comparar. Não invente dados para preencher lacunas.",
+      "PREÇO E OFERTA: se houver preço informado, identifique-o como preço fornecido e sujeito a alteração; não diga que está barato, em promoção ou com desconto sem preço de comparação e comprovação. Não crie urgência artificial. Recomende conferir o valor final, frete, vendedor e disponibilidade no link antes de publicar. Se o preço não foi informado, não inclua valor.",
+      "ROTEIRO: crie gancho forte nos primeiros 2 segundos, mas fiel aos fatos. Entregue todas as falas/narração completas, separadas do texto na tela. Inclua demonstração que possa ser realmente filmada com celular, sem pressupor que a pessoa possui o produto ou já o testou. Quando o produto não estiver em mãos, proponha roteiro baseado em pesquisa do anúncio e imagens permitidas, sem fingir demonstração própria.",
+      "STORYBOARD: a soma das cenas deve corresponder exatamente à duração total sugerida. Informe início, fim e duração de cada cena; não deixe lacunas nem sobreposições. A narração de cada cena deve corresponder ao roteiro falado naquele intervalo. Para cada cena inclua enquadramento, ação filmável, movimento de câmera, texto na tela e áudio/efeito opcional. Use instruções práticas, específicas e executáveis com celular.",
+      "SEO: não prometa viralização, alcance ou posição no ranking. Use palavras-chave com intenção de busca e compra, naturalmente, sem repetição artificial. Não invente especificações para inserir palavras-chave. Hashtags poucas, específicas e relevantes.",
       "Organize obrigatoriamente a resposta com estas seções e nesta ordem:",
-      "1. ÂNGULO E OBJETIVO: público provável, necessidade atendida, promessa editorial realista e objetivo do conteúdo.",
-      "2. ROTEIRO DE GRAVAÇÃO: duração sugerida, gancho nos primeiros 2 segundos, falas/narração completas, desenvolvimento, demonstração e CTA. Diferencie fala de texto na tela.",
-      "3. STORYBOARD CENA A CENA: tabela com tempo de início/fim, duração, enquadramento/plano, o que a pessoa deve filmar, ação/movimento de câmera, texto na tela, narração/fala e áudio/efeito sugerido. Planeje cenas graváveis com celular; não dependa de imagens inexistentes.",
-      "4. SEO POR PLATAFORMA: criar opções específicas para TikTok, Instagram Reels e YouTube Shorts. Para cada uma, fornecer título/gancho pesquisável, descrição otimizada, palavra-chave principal, palavras-chave secundárias e hashtags relevantes. Não repetir cegamente o mesmo texto entre plataformas.",
-      "5. LEGENDA E CTA: legenda pronta para copiar, chamada para ação e aviso transparente de link de afiliado.",
-      "6. CHECKLIST ANTES DE PUBLICAR: dados do produto a conferir, alegações que não devem ser feitas sem comprovação e adequação do link.",
-      "Use termos de busca naturais e intenção de compra; não faça keyword stuffing nem prometa viralização ou ranking. Hashtags devem ser poucas e pertinentes.",
+      "1. ÂNGULO E OBJETIVO: público provável (identifique como hipótese quando não houver dados), necessidade que o produto pode atender, fatos confirmados, pontos ainda não confirmados e objetivo editorial.",
+      "2. ROTEIRO DE GRAVAÇÃO: duração total, gancho nos primeiros 2 segundos, falas/narração completas com marcação de tempo, desenvolvimento e CTA. Separe claramente FALA/NARRAÇÃO e TEXTO NA TELA.",
+      "3. STORYBOARD CENA A CENA: tabela com início/fim, duração, enquadramento, o que filmar, ação/câmera, texto na tela, fala/narração e áudio. Os tempos precisam bater com o roteiro e somar a duração total.",
+      "4. SEO POR PLATAFORMA: TikTok, Instagram Reels e YouTube Shorts, cada um com título/gancho, descrição pronta, palavra-chave principal, palavras-chave secundárias e hashtags. Adapte a intenção e o texto para cada plataforma.",
+      "5. LEGENDA E CTA: legenda pronta para copiar, CTA claro e aviso transparente de link de afiliado. Não inclua placeholders como [SEU LINK] se o link fornecido puder ser usado; se não houver link, indique objetivamente onde inserir.",
+      "6. CHECKLIST ANTES DE PUBLICAR: validar atributos, tamanho/medidas, material, preço, frete, vendedor, avaliações, disponibilidade, link e regras da plataforma; listar expressamente qualquer alegação do roteiro que dependa de confirmação.",
+      "Faça uma checagem final antes de responder: (a) cada afirmação factual está sustentada pelos dados? (b) nenhuma experiência pessoal foi inventada? (c) storyboard e roteiro têm tempos coerentes? (d) preço e oferta não foram tratados como atuais sem confirmação? Corrija qualquer falha antes de entregar.",
       "Formato ou plataforma priorizada: " + format,
       "Produto: " + product,
-      "Preço informado: " + (price || "não informado"),
-      "Link de afiliado: " + (link || "não informado"),
-      "Informações adicionais verificadas: " + (details || "nenhuma")
+      "Preço informado pelo cadastro (não presumir que ainda está vigente): " + (price || "não informado"),
+      "Link de afiliado fornecido: " + (link || "não informado"),
+      "Informações adicionais fornecidas pelo usuário: " + (details || "nenhuma")
     ].join("\n");
     const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent";
     const requestBody = JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 3200, thinkingConfig: { thinkingLevel: "low" } }
+      generationConfig: { maxOutputTokens: 5000, thinkingConfig: { thinkingLevel: "low" } }
     });
     let response, data = {};
     for (let attempt = 0; attempt < 3; attempt++) {
