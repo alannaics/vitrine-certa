@@ -242,7 +242,7 @@ function brazilDateKey() {
 app.get("/api/daily-picks", async (_req, res) => {
   const dateKey = brazilDateKey();
   const cached = dailyPicksCache.get(dateKey);
-  if (cached && Date.now() - cached.createdAt < 20 * 60 * 60 * 1000) {
+  if (_req.query.refresh !== "1" && cached && Date.now() - cached.createdAt < 20 * 60 * 60 * 1000) {
     return res.json({ ...cached.payload, cached: true });
   }
   try {
