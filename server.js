@@ -223,11 +223,10 @@ app.get("/api/mercadolivre/products", async (req, res) => {
     const query = String(req.query.q || "").trim().slice(0, 100);
     if (!query) return res.status(400).json({ error: "Informe o nome do produto para pesquisar." });
     const token = await ensureMlToken();
+    const headers = { Accept: "application/json", Authorization: "Bearer " + token, "User-Agent": "VitrineCerta/1.0" };
     const url = new URL("https://api.mercadolibre.com/products/search");
     url.search = new URLSearchParams({ site_id: "MLB", q: query, limit: "50" }).toString();
-    const response = await fetch(url, {
-      headers: { Accept: "application/json", Authorization: "Bearer " + token, "User-Agent": "VitrineCerta/1.0" }
-    });
+    const response = await fetch(url, { headers });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(data.message || data.error || "A API de produtos do Mercado Livre respondeu HTTP " + response.status + ".");
@@ -236,43 +235,47 @@ app.get("/api/mercadolivre/products", async (req, res) => {
     const raw = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
     const candidates = raw.map(item => {
       const winner = item.buy_box_winner || item.buyBoxWinner || {};
-      const itemId = winner.item_id || winner.itemId || winner.id || item.item_id || item.itemId ||
-        (String(item.id || "").startsWith("MLB") ? item.id : null);
       const pics = item.pictures || item.main_picture || [];
       const pic = Array.isArray(pics) ? pics[0]?.url || pics[0]?.secure_url : pics?.url || pics?.secure_url;
-      const title = item.name || item.title || winner.title || "";
-      return { id: item.id || itemId || null, itemId, title,
-        price: winner.price ?? item.price ?? item.price_info?.price ?? null,
-        permalink: winner.permalink || item.permalink || (title ? "https://lista.mercadolivre.com.br/" + encodeURIComponent(title) : ""),
-        thumbnail: pic || winner.thumbnail || null,
-        rating: item.rating?.average ?? winner.rating_average ?? null,
-        category: item.domain_id || item.category_id || "Mercado Livre" };
-    }).filter(item => item.title);
-    const checked = await Promise.allSettled(candidates.filter(x => x.itemId).slice(0, 30).map(async item => {
-      const detailResponse = await fetch("https://api.mercadolibre.com/items/" + encodeURIComponent(item.itemId), {
-        headers: { Accept: "application/json", Authorization: "Bearer " + token, "User-Agent": "VitrineCerta/1.0" }
-      });
+      return { catalogId: item.id || null, itemId: winner.item_id || winner.itemId || winner.id || item.item_id || item.itemId || null,
+        title: item.name || item.title || winner.title || "", price: winner.price ?? item.price ?? item.price_info?.price ?? null,
+        permalink: winner.permalink || item.permalink || "", thumbnail: pic || winner.thumbnail || null,
+        rating: item.rating?.average ?? winner.rating_average ?? null, category: item.domain_id || item.category_id || "Mercado Livre" };
+    }).filter(item => item.title && item.catalogId);
+    const checked = await Promise.allSettled(candidates.slice(0, 30).map(async item => {
+      let itemId = item.itemId;
+      // Product detail may expose the current buy-box listing even when product search omits it.
+      if (!itemId) {
+        const productResponse = await fetch("https://api.mercadolibre.com/products/" + encodeURIComponent(item.catalogId), { headers });
+        const productDetail = await productResponse.json().catch(() => ({}));
+        if (productResponse.ok) {
+          const winner = productDetail.buy_box_winner || productDetail.buyBoxWinner || {};
+          itemId = winner.item_id || winner.itemId || winner.id || null;
+        }
+      }
+      if (!itemId) return { catalog: item };
+      const detailResponse = await fetch("https://api.mercadolibre.com/items/" + encodeURIComponent(itemId), { headers });
       const detail = await detailResponse.json().catch(() => ({}));
       if (!detailResponse.ok || detail.status !== "active" || Number(detail.available_quantity || 0) <= 0) return null;
-      return { ...item, id: detail.id, title: detail.title || item.title,
+      return { listing: { ...item, id: detail.id, title: detail.title || item.title,
         price: Number(detail.price ?? item.price) || null, permalink: detail.permalink || item.permalink,
         thumbnail: detail.thumbnail || item.thumbnail, sold_quantity: Number(detail.sold_quantity) || 0,
         available_quantity: Number(detail.available_quantity) || 0, listing_status: detail.status,
-        availabilityVerified: true, category: detail.category_id || item.category };
+        availabilityVerified: true, category: detail.category_id || item.category } };
     }));
-    const verified = checked.filter(x => x.status === "fulfilled" && x.value).map(x => x.value);
-    const verifiedIds = new Set(verified.map(x => String(x.id)));
-    const catalogOnly = candidates.filter(x => !x.itemId || !verifiedIds.has(String(x.itemId)))
-      .map(x => ({ ...x, sold_quantity: null, available_quantity: null, listing_status: "catalog",
-        availabilityVerified: false, availabilityNote: "Produto de catálogo. Abra a pesquisa para confirmar anúncios ativos, estoque e preço." }));
+    const verified = checked.filter(x => x.status === "fulfilled" && x.value?.listing).map(x => x.value.listing);
+    const verifiedIds = new Set(verified.map(x => String(x.catalogId)));
+    const catalogOnly = checked.filter(x => x.status === "fulfilled" && x.value?.catalog)
+      .map(x => ({ ...x.value.catalog, sold_quantity: null, available_quantity: null, listing_status: "catalog",
+        availabilityVerified: false, availabilityNote: "Produto de catálogo sem anúncio vencedor confirmado. Não é possível afirmar ranking de vendas ou estoque." }));
     const products = [...verified, ...catalogOnly].sort((a,b) => {
       if (a.availabilityVerified !== b.availabilityVerified) return a.availabilityVerified ? -1 : 1;
       return (Number(b.sold_quantity)||0) - (Number(a.sold_quantity)||0);
     });
-    res.json({ products, count: products.length, verifiedCount: verified.length,
-      catalogCount: catalogOnly.length, source: "API oficial de catálogo e anúncios do Mercado Livre",
-      ranking: "Anúncios ativos com estoque confirmado primeiro; catálogo sem oferta validada depois. Vendas só aparecem quando informadas pela API.",
-      availabilityVerified: false, updatedAt: new Date().toISOString() });
+    res.json({ products, count: products.length, verifiedCount: verified.length, catalogCount: catalogOnly.length,
+      source: "API oficial de catálogo e anúncios do Mercado Livre",
+      ranking: "Anúncios ativos com estoque confirmado, ordenados pelas vendas reportadas; catálogo sem anúncio confirmado aparece separado.",
+      updatedAt: new Date().toISOString() });
   } catch (error) {
     console.error("[mercadolivre-products]", error.message);
     res.status(error.status === 401 || error.status === 403 ? error.status : 502).json({
