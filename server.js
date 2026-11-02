@@ -373,7 +373,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
       "Link de afiliado: " + (link || "não informado"),
       "Informações adicionais verificadas: " + (details || "nenhuma")
     ].join("\n");
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
     const requestBody = JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 3200, thinkingConfig: { thinkingLevel: "low" } }
@@ -409,7 +409,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
     }
     const text = (data.candidates || []).flatMap(c => c.content?.parts || []).map(p => p.text || "").join("\n").trim();
     if (!text) return res.status(502).json({ error: "O Gemini não retornou texto. Tente novamente." });
-    res.json({ text, model: "gemini-3.8-flash" });
+    res.json({ text, model: "gemini-2.5-flash" });
   } catch (e) { console.error("Gemini generation failed:", e); res.status(502).json({ error: "Falha na comunicação com o serviço de IA: " + (e.message || "erro desconhecido") }); }
 });
 
