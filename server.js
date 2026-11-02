@@ -282,6 +282,41 @@ app.get("/api/mercadolivre/products", async (req, res) => {
   }
 });
 
+app.post("/api/affiliate/inspect", requireDashboardToken, async (req, res) => {
+  try {
+    const link = String(req.body?.link || "").trim();
+    const name = String(req.body?.name || "").trim().slice(0, 120);
+    if (!/^https?:\/\//i.test(link)) return res.status(400).json({ error: "Informe um link http ou https válido." });
+    const parsed = new URL(link);
+    const host = parsed.hostname.toLowerCase();
+    if (host.includes("mercadolivre") || host.includes("mercadolibre")) {
+      const match = (parsed.pathname.match(/(MLB-?\d{6,})/i) || [])[1];
+      if (!match) return res.status(422).json({ marketplace: "Mercado Livre", message: "Não consegui identificar o código do anúncio neste link. Mantenha o nome e o link; preço e comissão podem ser conferidos manualmente." });
+      const itemId = match.replace("-", "").toUpperCase();
+      const token = await ensureMlToken();
+      const response = await fetch("https://api.mercadolibre.com/items/" + encodeURIComponent(itemId), { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+      const item = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(item.message || "Mercado Livre respondeu HTTP " + response.status + ".");
+      return res.json({ marketplace: "Mercado Livre", name: item.title || name, price: item.price ?? null, category: item.category_id || "", rating: null, sold: item.sold_quantity ?? null, freeShipping: item.shipping?.free_shipping === true, available: item.status === "active" && Number(item.available_quantity || 0) > 0, commission: null, commissionNote: "A API pública de anúncios do Mercado Livre não informa a comissão do seu programa de afiliados. Esse dado precisa vir do painel de afiliados.", source: "API de anúncios do Mercado Livre", updatedAt: new Date().toISOString() });
+    }
+    if (host.includes("shopee")) {
+      const keyword = name || decodeURIComponent(parsed.pathname.split("/").filter(Boolean).pop() || "").replace(/[-_]/g, " ").slice(0, 80);
+      if (!keyword) return res.status(422).json({ marketplace: "Shopee", message: "Informe também o nome do produto para consultar a oferta na API de afiliados." });
+      const query = "{ productOfferV2(keyword: " + JSON.stringify(keyword.replace(/["\\]/g, "")) + ", listType: 0, sortType: 1, page: 1, limit: 50) { nodes { itemId productName productLink offerLink imageUrl priceMin priceMax sales ratingStar commissionRate sellerCommissionRate shopeeCommissionRate commission shopId shopName } } }";
+      const data = await shopeeRequest(query);
+      const nodes = data?.productOfferV2?.nodes || [];
+      const idMatch = parsed.pathname.match(/-i\.(\d+)\.(\d+)/);
+      const found = nodes.find(p => idMatch && String(p.itemId) === String(idMatch[2])) || nodes.find(p => (p.productName || "").toLowerCase() === keyword.toLowerCase()) || null;
+      if (!found) return res.json({ marketplace: "Shopee", name, message: "A API não retornou uma oferta correspondente com segurança. Não vou associar comissão de outro produto. Confira se o acesso de afiliado está ativo e tente novamente.", commission: null, source: "Shopee Affiliate Open API" });
+      return res.json({ marketplace: "Shopee", name: found.productName || name, price: found.priceMin ?? found.priceMax ?? null, category: "", rating: found.ratingStar ?? null, sold: found.sales ?? null, freeShipping: null, available: null, commission: found.commissionRate ?? found.sellerCommissionRate ?? found.shopeeCommissionRate ?? found.commission ?? null, commissionNote: "Comissão retornada pela oferta da API; confirme regras e valor final no painel de afiliados.", offerLink: found.offerLink || found.productLink || "", source: "Shopee Affiliate Open API", updatedAt: new Date().toISOString() });
+    }
+    return res.status(422).json({ error: "Domínio não reconhecido. Use um link da Shopee ou do Mercado Livre." });
+  } catch (e) {
+    console.error("[affiliate-inspect]", e.message);
+    res.status(e.status || 502).json({ error: e.message || "Não foi possível identificar os dados deste link." });
+  }
+});
+
 app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
   try {
     const start = Number(req.query.start);
