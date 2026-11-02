@@ -77,7 +77,43 @@ function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.
 el("nav").onclick=e=>{let b=e.target.closest("button[data-page]");if(b)showPage(b.dataset.page)};
 function renderAiProducts(){const sel=el("aiProduct");if(!sel)return;const old=sel.value;sel.innerHTML=db.products.map((p,i)=>"<option value=\""+i+"\">"+safe(p.name)+"</option>").join("");if(old&&Number(old)<db.products.length)sel.value=old;}
 async function checkGemini(){const status=el("aiStatus");if(!status)return;try{const r=await fetch("/api/gemini/status");const d=await r.json();status.textContent=d.configured?"Gemini configurado. Pronto para gerar conteúdo.":"Gemini aguardando chave no servidor.";}catch(e){status.textContent="Não foi possível verificar a IA.";}}
-async function generateWithGemini(){const status=el("aiStatus"),out=el("aiOutput"),p=db.products[Number(el("aiProduct").value)];if(!p){status.textContent="Cadastre ou selecione um produto primeiro.";return;}status.textContent="Gerando conteúdo...";out.value="";const token=el("dashboardToken")?.value.trim()||sessionStorage.getItem("vcDashboardToken")||"";const payload={product:p.name,price:p.price,link:p.link,format:el("aiFormat").value,details:el("aiDetails").value};for(let attempt=1;attempt<=2;attempt++){try{const r=await fetch("/api/gemini/generate",{method:"POST",headers:{"Content-Type":"application/json","x-dashboard-token":token},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"O servidor respondeu com erro HTTP "+r.status+".");if(!d.text)throw new Error("O Gemini respondeu, mas não enviou texto. Tente novamente.");out.value=d.text;status.textContent="Conteúdo gerado com "+(d.model||"Gemini")+". Revise antes de publicar.";return;}catch(e){const networkFailure=e instanceof TypeError||/failed to fetch|networkerror|load failed/i.test(e.message);if(networkFailure&&attempt===1){status.textContent="Conexão instável. Reconectando automaticamente...";await new Promise(resolve=>setTimeout(resolve,1800));continue;}status.textContent=networkFailure?"Não consegui alcançar o servidor após duas tentativas. O serviço pode estar acordando ou temporariamente indisponível; tente novamente em um minuto.":e.message;return;}}}
+async function generateWithGemini(){
+ const status=el("aiStatus"),out=el("aiOutput"),p=db.products[Number(el("aiProduct").value)];
+ const button=document.querySelector('button[onclick="generateWithGemini()"]');
+ if(!p){status.textContent="Cadastre ou selecione um produto primeiro.";return;}
+ if(button)button.disabled=true;
+ out.value="";
+ const token=el("dashboardToken")?.value.trim()||sessionStorage.getItem("vcDashboardToken")||"";
+ const headers={"Content-Type":"application/json","x-dashboard-token":token};
+ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+ const request=async(url,options={},timeoutMs=20000)=>{
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{return await fetch(url,{...options,signal:controller.signal});}
+  finally{clearTimeout(timer);}
+ };
+ try{
+  let ready=false,lastError="";
+  for(let attempt=1;attempt<=4;attempt++){
+   status.textContent=attempt===1?"Conectando à Vitrine Certa e verificando o servidor...":"Aguardando o servidor despertar ("+attempt+"/4)...";
+   try{
+    const health=await request("/api/health",{cache:"no-store"},22000);
+    if(health.ok){ready=true;break;}
+    lastError="Servidor respondeu com HTTP "+health.status+".";
+   }catch(e){lastError=e.name==="AbortError"?"O servidor ainda está inicializando.":e.message;}
+   if(attempt<4)await wait(2500*attempt);
+  }
+  if(!ready)throw new Error("Não foi possível iniciar a conexão com o servidor após quatro verificações. "+lastError+" Aguarde um minuto e tente novamente.");
+  status.textContent="Servidor conectado. Gerando roteiro, storyboard e SEO...";
+  const r=await request("/api/gemini/generate",{method:"POST",headers,body:JSON.stringify({product:p.name,price:p.price,link:p.link,format:el("aiFormat").value,details:el("aiDetails").value})},95000);
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||"Erro HTTP "+r.status+" ao gerar a campanha.");
+  if(!d.text)throw new Error("O serviço de IA respondeu sem conteúdo. Tente novamente.");
+  out.value=d.text;
+  status.textContent="Pacote completo gerado com "+(d.model||"Gemini")+". Revise os dados antes de publicar.";
+ }catch(e){
+  status.textContent=e.name==="AbortError"?"A geração excedeu o limite de 95 segundos. O pedido foi encerrado; tente novamente.":(e.message||"Falha inesperada na geração.");
+ }finally{if(button)button.disabled=false;}
+}
 function copyAiOutput(){const t=el("aiOutput").value;if(!t){alert("Gere um conteúdo primeiro.");return;}navigator.clipboard.writeText(t).then(()=>alert("Conteúdo copiado.")).catch(()=>{el("aiOutput").select();document.execCommand("copy");alert("Conteúdo copiado.");});}
 
 let discoveryItems=[];
