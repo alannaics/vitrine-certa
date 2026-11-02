@@ -327,7 +327,7 @@ async function searchDiscoveryProducts(){
  try{
   const groups=await Promise.all(jobs);const all=groups.flatMap(g=>g.items.map(p=>({...p,_market:g.market})));
   window.discoveryProductResults=all;
-  results.innerHTML='<div class="toolbar" style="margin:10px 0"><label for="discoverySort">Ordenar resultados:</label><select id="discoverySort" onchange="renderDiscoveryProductCards()"><option value="relevance">Relevância</option><option value="price">Menor preço</option><option value="sales">Mais vendidos (quando informado)</option><option value="rating">Melhor avaliação</option><option value="commission">Maior comissão informada</option></select></div><div id="discoveryProductCards" class="discovery-grid"></div>';
+  results.innerHTML='<div class="toolbar" style="margin:10px 0"><label for="discoverySort">Ordenar resultados:</label><select id="discoverySort" onchange="renderDiscoveryProductCards()"><option value="relevance">Relevância</option><option value="price">Menor preço</option><option value="sales">Mais vendidos (quando informado)</option><option value="rating">Melhor avaliação</option><option value="commission">Maior comissão informada</option></select></div><div id="discoveryProductCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px"></div>';
   renderDiscoveryProductCards();
   const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);
   status.textContent=all.length+" resultado(s) listado(s) para \""+query+"\". "+groups.filter(g=>g.items.length).map(g=>g.market+": "+g.items.length).join(" · ")+(errors.length?" | Indisponível: "+errors.join(" | "):"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
