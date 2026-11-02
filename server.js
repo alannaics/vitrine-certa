@@ -4,7 +4,7 @@ const path = require("node:path");
 const { Pool } = require("pg");
 
 const app = express();
-app.use(express.json({ limit: "100kb" }));
+app.use(express.json({ limit: "1mb" }));
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 const PORT = process.env.PORT || 3000;
@@ -360,14 +360,24 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
     });
     let response, data = {};
     for (let attempt = 0; attempt < 3; attempt++) {
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
-        body: requestBody
-      });
-      data = await response.json().catch(() => ({}));
+      const controller = new AbortController();
+      const requestTimeout = setTimeout(() => controller.abort(), 50000);
+      try {
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+          body: requestBody,
+          signal: controller.signal
+        });
+        data = await response.json().catch(() => ({}));
+      } catch (error) {
+        if (error.name === "AbortError") {
+          return res.status(504).json({ error: "O Gemini não respondeu em 50 segundos. A solicitação foi encerrada; tente novamente." });
+        }
+        throw error;
+      } finally { clearTimeout(requestTimeout); }
       if (response.ok || ![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) break;
-      await new Promise(resolve => setTimeout(resolve, 900 * (attempt + 1)));
+      await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
     }
     if (!response.ok) {
       const status = response.status;
@@ -380,7 +390,7 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
     const text = (data.candidates || []).flatMap(c => c.content?.parts || []).map(p => p.text || "").join("\n").trim();
     if (!text) return res.status(502).json({ error: "O Gemini não retornou texto. Tente novamente." });
     res.json({ text, model: "gemini-3.8-flash" });
-  } catch (e) { res.status(500).json({ error: e.message || "Erro ao consultar o Gemini." }); }
+  } catch (e) { console.error("Gemini generation failed:", e); res.status(502).json({ error: "Falha na comunicação com o serviço de IA: " + (e.message || "erro desconhecido") }); }
 });
 
 app.get("/api/health", async (_req, res) => {
