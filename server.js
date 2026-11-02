@@ -227,6 +227,63 @@ app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
 
 
 
+
+const dailyPicksCache = new Map();
+const femaleSearches = [
+  { keyword: "moda feminina", category: "Moda feminina" },
+  { keyword: "beleza maquiagem skincare", category: "Beleza" },
+  { keyword: "bolsa feminina acessorios", category: "Bolsas e acessórios" },
+  { keyword: "legging fitness feminina", category: "Fitness feminino" },
+  { keyword: "sapato feminino", category: "Calçados femininos" }
+];
+function brazilDateKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+app.get("/api/daily-picks", async (_req, res) => {
+  const dateKey = brazilDateKey();
+  const cached = dailyPicksCache.get(dateKey);
+  if (cached && Date.now() - cached.createdAt < 20 * 60 * 60 * 1000) {
+    return res.json({ ...cached.payload, cached: true });
+  }
+  try {
+    const batches = await Promise.all(femaleSearches.map(async group => {
+      const url = new URL("https://api.mercadolibre.com/sites/MLB/search");
+      url.search = new URLSearchParams({ q: group.keyword, sort: "sold_quantity_desc", limit: "20" }).toString();
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error("Mercado Livre (" + group.category + ") respondeu HTTP " + response.status);
+      return (data.results || []).map(item => ({
+        id: String(item.id), title: String(item.title || ""), price: Number(item.price) || null,
+        currency: item.currency_id || "BRL", soldQuantity: Number(item.sold_quantity) || 0,
+        rating: Number(item.reviews?.rating_average || item.rating_average) || null,
+        permalink: String(item.permalink || ""), thumbnail: String(item.thumbnail || "").replace("-I.jpg", "-W.jpg"),
+        sellerId: item.seller?.id || null, category: group.category,
+        condition: item.condition || null, shippingFree: Boolean(item.shipping?.free_shipping),
+        platform: "Mercado Livre", source: "API pública de busca do Mercado Livre"
+      }));
+    }));
+    const unique = new Map();
+    batches.flat().forEach(item => {
+      if (!item.id || !item.title || !item.permalink) return;
+      const previous = unique.get(item.id);
+      if (!previous || item.soldQuantity > previous.soldQuantity) unique.set(item.id, item);
+    });
+    const ranked = [...unique.values()].sort((a,b) => b.soldQuantity - a.soldQuantity || a.title.localeCompare(b.title, "pt-BR")).slice(0,5)
+      .map((item,index) => ({ ...item, rank: index + 1 }));
+    const payload = {
+      date: dateKey, updatedAt: new Date().toISOString(), count: ranked.length,
+      products: ranked,
+      source: "Mercado Livre — API pública de busca, consultas em categorias de interesse feminino, ordenadas por sold_quantity_desc",
+      methodology: "Cinco anúncios com maior quantidade de vendas exibida entre as buscas consultadas. O campo sold_quantity pode ser apresentado em faixas referenciais pela plataforma; não representa vendas do dia nem garante conversão."
+    };
+    dailyPicksCache.set(dateKey, { createdAt: Date.now(), payload });
+    res.json(payload);
+  } catch (error) {
+    console.error("[daily-picks]", error.message);
+    res.status(502).json({ error: "Não foi possível atualizar os cinco produtos de hoje. " + error.message });
+  }
+});
+
 app.get("/api/mercadolivre/discovery", async (_req, res) => {
   try {
     const token = await ensureMlToken();
