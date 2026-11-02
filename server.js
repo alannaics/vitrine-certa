@@ -201,7 +201,12 @@ app.get("/api/shopee/products", requireDashboardToken, async (req, res) => {
       "priceDiscountRate sales ratingStar commissionRate sellerCommissionRate " +
       "shopeeCommissionRate commission shopId shopName shopType } pageInfo { page limit hasNextPage } } }";
     const data = await shopeeRequest(query);
-    res.json(data?.productOfferV2 || { nodes: [], pageInfo: {} });
+    const result = data?.productOfferV2 || { nodes: [], pageInfo: {} };
+    const nodes = (result.nodes || [])
+      .filter(item => Number(item.sales || 0) > 0)
+      .sort((a, b) => Number(b.sales || 0) - Number(a.sales || 0));
+    res.json({ ...result, nodes, ranking: "Produtos com vendas informadas, ordenados por sales decrescente.", availabilityVerified: false,
+      availabilityNote: "A API de ofertas consultada não fornece um campo confiável de estoque nesta consulta; confirme a disponibilidade na página do produto." });
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
