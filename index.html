@@ -103,7 +103,7 @@ td,th{padding:14px 13px}th{background:#fff7fa}
 <div class="card" style="margin:14px 0"><h2>Visão geral das etapas</h2><div class="muted">O progresso será atualizado conforme as entregas forem verificadas. Dependências de autorização externa ficarão identificadas.</div>
 <div class="grid content" style="margin-top:14px">
 <article class="discovery-card"><span class="pill">ETAPA 01 · EM ANDAMENTO</span><h3>Busca e catálogo profissional</h3><p class="muted">Relevância da busca, comparação de ofertas, agrupamento de produtos iguais, filtros e salvamento individual.</p><button class="btn primary" onclick="showPage('discovery')">Abrir inteligência</button><button class="btn" onclick="showPage('products')">Abrir catálogo</button></article>
-<article class="discovery-card"><span class="pill">ETAPA 02 · PRÓXIMA</span><h3>Inteligência comercial</h3><p class="muted">Potencial de mercado, qualidade da oferta, histórico de preços e ranking com fonte verificável.</p><button class="btn" onclick="showPage('discovery')">Abrir radar</button></article>
+<article class="discovery-card"><span class="pill">ETAPA 02 · EM IMPLEMENTAÇÃO</span><h3>Inteligência comercial</h3><p class="muted">Potencial de mercado, qualidade da oferta, histórico de preços e ranking com fonte verificável.</p><button class="btn" onclick="showPage('discovery')">Abrir radar</button></article>
 <article class="discovery-card"><span class="pill">ETAPA 03 · PLANEJADA</span><h3>Links de afiliado</h3><p class="muted">Gerar, validar e relacionar links à oferta exata, com status e comissão identificados.</p><button class="btn" onclick="showPage('products')">Abrir produtos</button><button class="btn" onclick="showPage('settings')">Conexões</button></article>
 <article class="discovery-card"><span class="pill">ETAPA 04 · PLANEJADA</span><h3>Conteúdo e campanhas</h3><p class="muted">Gemini conectado ao catálogo, variações de roteiro, campanhas salvas e conteúdo associado à oferta.</p><button class="btn" onclick="showPage('scripts')">Abrir conteúdos</button></article>
 <article class="discovery-card"><span class="pill">ETAPA 05 · PLANEJADA</span><h3>Gestão, resultados e escala</h3><p class="muted">Conversões, comissões, relatórios, histórico, banco estruturado e experiência mobile.</p><button class="btn" onclick="showPage('results')">Abrir resultados</button></article>
@@ -348,12 +348,26 @@ async function searchDiscoveryProducts(){
  try{
   const groups=await Promise.all(jobs);const all=groups.flatMap(g=>g.items.map(p=>({...p,_market:g.market})));
   window.discoveryProductResults=all;
-  results.innerHTML='<div class="toolbar" style="margin:10px 0"><label for="discoverySort">Ordenar resultados:</label><select id="discoverySort" onchange="renderDiscoveryProductCards()"><option value="relevance">Relevância</option><option value="price">Menor preço</option><option value="sales">Mais vendidos (quando informado)</option><option value="rating">Melhor avaliação</option><option value="commission">Maior comissão informada</option></select></div><div id="discoveryProductCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px"></div>';
+  results.innerHTML='<div class="toolbar" style="margin:10px 0"><label for="discoverySort">Ordenar resultados:</label><select id="discoverySort" onchange="renderDiscoveryProductCards()"><option value="relevance">Relevância</option><option value="price">Menor preço</option><option value="sales">Mais vendidos (quando informado)</option><option value="rating">Melhor avaliação</option><option value="commission">Maior comissão informada</option><option value="score">Melhores sinais comerciais</option></select></div><div id="discoveryProductCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px"></div>';
   renderDiscoveryProductCards();
   const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);
   status.textContent=all.length+" resultado(s) listado(s) para \""+query+"\". "+groups.filter(g=>g.items.length).map(g=>g.market+": "+g.items.length).join(" · ")+(errors.length?" | Indisponível: "+errors.join(" | "):"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
  }catch(e){status.textContent=e.message;}
  finally{button.disabled=false;}
+}
+function commercialOfferScore(p){
+ const parts=[];
+ const sold=Number(p.sales??p.sold_quantity);
+ if(Number.isFinite(sold)&&sold>0)parts.push({label:"Vendas informadas",points:sold>=500?25:sold>=100?20:sold>=20?14:7});
+ const rating=Number(p.ratingStar??p.rating);
+ if(Number.isFinite(rating)&&rating>0)parts.push({label:"Avaliação",points:rating>=4.8?20:rating>=4.5?16:rating>=4?12:6});
+ const commission=Number(p.commissionRate??p.commission);
+ if(Number.isFinite(commission)&&commission>0)parts.push({label:"Comissão informada",points:Math.min(20,Math.round(commission)));
+ const price=Number(p.priceMin??p.price);
+ if(Number.isFinite(price)&&price>0)parts.push({label:"Preço disponível",points:10});
+ if(p.resultType==="active"||p.availabilityVerified===true)parts.push({label:"Anúncio/estoque confirmado",points:20});
+ if(p.shopName||p.sellerName||p.sellerId||p.shopId)parts.push({label:"Vendedor identificado",points:5});
+ return {score:parts.reduce((n,x)=>n+x.points,0),known:parts.length,parts,missing:["vendas","avaliação","comissão","preço","disponibilidade","vendedor"].filter(k=>!parts.some(x=>({vendas:"Vendas informadas",avaliação:"Avaliação",comissão:"Comissão informada",preço:"Preço disponível",disponibilidade:"Anúncio/estoque confirmado",vendedor:"Vendedor identificado"})[k]===x.label))};
 }
 function renderDiscoveryProductCards(){
  const target=el("discoveryProductCards");if(!target)return;
@@ -367,6 +381,7 @@ function renderDiscoveryProductCards(){
   if(sort==="sales")return (num(b.sales??b.sold_quantity)??-1)-(num(a.sales??a.sold_quantity)??-1);
   if(sort==="rating")return (num(b.ratingStar??b.rating)??-1)-(num(a.ratingStar??a.rating)??-1);
   if(sort==="commission")return (num(b.commissionRate??b.commission)??-1)-(num(a.commissionRate??a.commission)??-1);
+  if(sort==="score")return commercialOfferScore(b).score-commercialOfferScore(a).score;
   return score(b)-score(a);
  });
  window.discoveryProductResults=all;
@@ -374,6 +389,7 @@ function renderDiscoveryProductCards(){
   const marketName=p._market||"Marketplace",name=p.productName||p.title||p.name||"Produto sem título";
   const price=p.priceMin??p.price??null,image=p.imageUrl||p.thumbnail||"",link=p.offerLink||p.productLink||p.permalink||"";
   const sales=p.sales??p.sold_quantity,rating=p.ratingStar??p.rating,commission=p.commissionRate??p.commission;
+  const commercial=commercialOfferScore(p);
   const state=p.resultType==="active"?"Anúncio ativo · estoque confirmado":p.resultType==="catalog"?"Resultado de catálogo · anúncio/estoque não confirmados":"Oferta retornada pela API de afiliados";
   return '<article class="discovery-card">'+(image?'<img src="'+safe(image)+'" alt="" style="width:100%;height:145px;object-fit:contain;border-radius:10px;background:#fff7fa">':'')+
    '<span class="pill">'+safe(marketName)+' · '+state+'</span><h3>'+safe(name)+'</h3>'+
@@ -381,6 +397,7 @@ function renderDiscoveryProductCards(){
    '<div class="discovery-meta">'+(sales!==undefined&&sales!==null?"Vendas informadas: "+safe(sales):"Vendas não informadas")+' · '+(rating!==undefined&&rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+'</div>'+
    '<div class="discovery-meta">'+(commission!==undefined&&commission!==null?"Comissão informada: "+safe(commission):"Comissão não informada")+'</div>'+
    '<div class="discovery-meta">'+(p.shopName||p.sellerName?"Vendedor: "+safe(p.shopName||p.sellerName):"Vendedor não informado")+'</div>'+
+   '<div class="notice"><b>Sinais comerciais: '+commercial.score+'/100</b> · '+commercial.known+'/6 dados disponíveis<br><small>'+safe(commercial.parts.map(x=>x.label+" +"+x.points).join(" · ")||"Sem sinais comerciais suficientes")+'</small></div>'+
    '<div class="toolbar">'+(link?'<a class="btn" href="'+safe(link)+'" target="_blank" rel="noopener">Abrir oferta</a>':'')+
    '<button class="btn primary" onclick="saveDiscoveryProduct('+index+')">Salvar no catálogo</button></div></article>';
  }).join("");
