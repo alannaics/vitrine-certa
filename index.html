@@ -12,8 +12,9 @@
 <div class="card">
 <h2>Radar de oportunidades · Mercado Livre</h2>
 <p class="muted">Monitore termos em alta para orientar sua pesquisa de anúncios em moda, beleza, acessórios, casa e tecnologia. Tendências de busca não comprovam vendas.</p>
-<div class="toolbar"><button class="btn primary" id="runDiscovery" onclick="runDiscovery()">Buscar produtos em alta</button><span id="discoveryStatus" class="muted">A pesquisa pública de anúncios não exige aprovação da API de afiliados. A busca usa a conexão oficial do Mercado Livre. Se a autorização expirar, reconecte em Configurações.</span></div>
-<div class="notice">As tendências representam buscas populares da semana, não anúncios. Abra os resultados para conferir preço, vendedor, estoque e avaliações; depois gere/adicione seu link oficial de afiliado.</div>
+<div class="toolbar"><button class="btn primary" id="runDiscovery" onclick="runDiscovery()">Atualizar tendências</button><span id="discoveryStatus" class="muted">Consulte os termos populares e use-os como ponto de partida para pesquisar anúncios reais.</span></div>
+<div class="notice">Importante: esta etapa identifica termos de busca, não produtos vendidos. Antes de cadastrar uma oportunidade, abra anúncios e confira preço final, vendas exibidas, avaliação, vendedor, estoque e comissão.</div>
+<div class="toolbar"><input class="field" id="discoverySearch" placeholder="Filtrar termos..." style="max-width:260px" oninput="renderDiscoveryCards()"><select class="field" id="discoveryCategory" style="max-width:220px" onchange="renderDiscoveryCards()"><option value="">Todas as categorias</option><option>Beleza</option><option>Moda e acessórios</option><option>Casa e organização</option><option>Tecnologia</option><option>Interesse feminino</option></select><select class="field" id="discoverySort" style="max-width:190px" onchange="renderDiscoveryCards()"><option value="rank">Maior tendência primeiro</option><option value="alpha">Ordem alfabética</option><option value="category">Categoria</option></select></div>
 </div>
 <div id="discoveryResults" class="grid content" style="margin-top:14px"></div>
 </section>
@@ -182,9 +183,17 @@ async function runDiscovery(){
   if(!r.ok)throw new Error(d.error||"Não foi possível consultar o Mercado Livre.");
   discoveryItems=d.products||[];
   if(!discoveryItems.length){status.textContent="Nenhum termo relacionado ao público da Vitrine foi encontrado nesta atualização.";return;}
-  status.textContent=discoveryItems.length+" termos encontrados. Índice calculado pela posição na lista oficial; não representa vendas ou crescimento. Atualizado em "+new Date(d.updatedAt).toLocaleString("pt-BR")+".";
-  results.innerHTML=discoveryItems.map((p,i)=>'<article class="discovery-card"><div class="notice">Sinal de tendência · posição #'+p.trendRank+' · índice '+p.trendScore+'/100</div><span class="pill">'+safe(p.category)+'</span><h3>'+safe(p.title)+'</h3><div class="discovery-meta">Fonte: tendências semanais do Mercado Livre. Localize um anúncio e valide preço, vendas, avaliação, estoque e comissão.</div><div class="toolbar"><a class="btn" target="_blank" rel="noopener" href="'+safe(p.permalink)+'">Pesquisar anúncios</a><button class="btn primary" onclick="saveDiscoveryProduct('+i+')">Adicionar ao catálogo</button></div></article>').join("");
+  status.textContent=discoveryItems.length+" termos de tendência encontrados. Posição na lista não representa volume, crescimento ou vendas. Atualizado em "+new Date(d.updatedAt).toLocaleString("pt-BR")+".";
+  renderDiscoveryCards();
  }catch(e){status.textContent=e.message;}finally{button.disabled=false;}
+}
+function renderDiscoveryCards(){
+ const results=el("discoveryResults");if(!results)return;
+ const query=(el("discoverySearch")?.value||"").trim().toLocaleLowerCase("pt-BR");
+ const category=el("discoveryCategory")?.value||"",sort=el("discoverySort")?.value||"rank";
+ const filtered=discoveryItems.map((p,index)=>({...p,_index:index})).filter(p=>(!query||p.title.toLocaleLowerCase("pt-BR").includes(query))&&(!category||p.category===category));
+ filtered.sort((a,b)=>sort==="alpha"?a.title.localeCompare(b.title,"pt-BR"):sort==="category"?a.category.localeCompare(b.category,"pt-BR")||a.trendRank-b.trendRank:a.trendRank-b.trendRank);
+ results.innerHTML=filtered.length?filtered.map(p=>'<article class="discovery-card"><div class="notice">Termo em tendência · posição #'+p.trendRank+' · índice relativo '+p.trendScore+'/100</div><span class="pill">'+safe(p.category)+'</span><h3>'+safe(p.title)+'</h3><div class="discovery-meta">Não é um anúncio. Pesquise ofertas e valide os dados do produto diretamente na plataforma.</div><div class="toolbar"><a class="btn" target="_blank" rel="noopener" href="'+safe(p.permalink)+'">Pesquisar anúncios</a><button class="btn primary" onclick="saveDiscoveryProduct('+p._index+')">Salvar termo no catálogo</button></div></article>').join(""):'<div class="card"><b>Nenhum termo corresponde aos filtros.</b><p class="muted">Altere a busca ou selecione outra categoria.</p></div>';
 }
 function saveDiscoveryProduct(i){
  const p=discoveryItems[i];if(!p)return;
