@@ -1,6 +1,7 @@
 const express = require("express");
 const crypto = require("node:crypto");
 const path = require("node:path");
+const { Pool } = require("pg");
 
 const app = express();
 app.use(express.json({ limit: "100kb" }));
@@ -60,6 +61,57 @@ function requireDashboardToken(req, res, next) {
 
 
 const ML_CLIENT_ID = process.env.ML_CLIENT_ID;
+const DATABASE_URL = process.env.DATABASE_URL;
+const db = DATABASE_URL ? new Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 3,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000
+}) : null;
+
+function tokenEncryptionKey() {
+  if (!ML_CLIENT_SECRET) return null;
+  return crypto.scryptSync(ML_CLIENT_SECRET, "vitrine-certa-ml-oauth-v1", 32);
+}
+function encryptTokens(value) {
+  const key = tokenEncryptionKey();
+  if (!key) throw new Error("ML_CLIENT_SECRET é necessário para proteger a sessão do Mercado Livre.");
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64");
+}
+function decryptTokens(value) {
+  const key = tokenEncryptionKey();
+  if (!key) throw new Error("ML_CLIENT_SECRET não configurado.");
+  const packed = Buffer.from(value, "base64");
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, packed.subarray(0, 12));
+  decipher.setAuthTag(packed.subarray(12, 28));
+  return JSON.parse(Buffer.concat([decipher.update(packed.subarray(28)), decipher.final()]).toString("utf8"));
+}
+async function saveMlTokens() {
+  if (!db || !mlRefreshToken) return;
+  const encrypted = encryptTokens({ accessToken: mlAccessToken, refreshToken: mlRefreshToken, expiresAt: mlTokenExpiresAt });
+  await db.query(
+    "INSERT INTO app_secrets (secret_name, secret_value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (secret_name) DO UPDATE SET secret_value = EXCLUDED.secret_value, updated_at = NOW()",
+    ["mercadolivre_oauth", encrypted]
+  );
+}
+async function loadMlTokens() {
+  if (!db) return;
+  const result = await db.query("SELECT secret_value FROM app_secrets WHERE secret_name = $1", ["mercadolivre_oauth"]);
+  if (!result.rows.length) return;
+  const saved = decryptTokens(result.rows[0].secret_value);
+  mlAccessToken = saved.accessToken || null;
+  mlRefreshToken = saved.refreshToken || null;
+  mlTokenExpiresAt = Number(saved.expiresAt) || 0;
+}
+async function initializeDatabase() {
+  if (!db) return;
+  await db.query("CREATE TABLE IF NOT EXISTS app_secrets (secret_name TEXT PRIMARY KEY, secret_value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+  await loadMlTokens();
+}
 const ML_CLIENT_SECRET = process.env.ML_CLIENT_SECRET;
 const ML_REDIRECT_URI = process.env.ML_REDIRECT_URI || "https://vitrine-certa.onrender.com/oauth/mercadolivre/callback";
 let mlAccessToken = null;
@@ -105,13 +157,15 @@ async function ensureMlToken() {
   mlAccessToken = data.access_token;
   mlRefreshToken = data.refresh_token;
   mlTokenExpiresAt = Date.now() + Number(data.expires_in || 21600) * 1000;
+  await saveMlTokens();
   return mlAccessToken;
 }
 
 app.get("/api/status", (_req, res) => {
   res.json({
+    database: { configured: Boolean(db) },
     shopee: { configured: Boolean(APP_ID && APP_SECRET) },
-    mercadoLivre: { configured: mlConfigured(), connected: Boolean(mlRefreshToken), mode: mlRefreshToken ? "oauth_connected_memory" : "manual", note: "OAuth de consulta da API de vendedores; métricas de afiliados permanecem separadas." }
+    mercadoLivre: { configured: mlConfigured(), connected: Boolean(mlRefreshToken), mode: mlRefreshToken ? "oauth_connected_persistent" : "manual", note: "OAuth de consulta da API de vendedores; métricas de afiliados permanecem separadas." }
   });
 });
 
@@ -241,6 +295,7 @@ app.get("/oauth/mercadolivre/callback", async (req, res) => {
     mlAccessToken = data.access_token;
     mlRefreshToken = data.refresh_token;
     mlTokenExpiresAt = Date.now() + Number(data.expires_in || 21600) * 1000;
+    await saveMlTokens();
     res.type("html").send("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Mercado Livre conectado</title><body style='font:16px system-ui;max-width:560px;margin:12vh auto;padding:24px;color:#28232a'><h2>Autorização recebida</h2><p>O Mercado Livre foi conectado ao Vitrine Certa nesta sessão do servidor.</p><p>Volte ao painel para verificar o status. No plano gratuito, uma reinicialização pode exigir nova autorização.</p><a href='/'>Voltar ao Vitrine Certa</a></body></html>");
   } catch (e) { res.status(e.status || 500).send("Não foi possível concluir a conexão: " + String(e.message)); }
 });
@@ -306,5 +361,17 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message || "Erro ao consultar o Gemini." }); }
 });
 
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
-app.listen(PORT, () => console.log("Vitrine Certa API listening on " + PORT));
+app.get("/api/health", async (_req, res) => {
+  let database = "not_configured";
+  if (db) {
+    try { await db.query("SELECT 1"); database = "connected"; }
+    catch { database = "error"; }
+  }
+  res.status(database === "error" ? 503 : 200).json({ ok: database !== "error", database });
+});
+initializeDatabase()
+  .then(() => app.listen(PORT, () => console.log("Vitrine Certa API listening on " + PORT + "; database " + (db ? "connected" : "not configured"))))
+  .catch(error => {
+    console.error("Database initialization failed:", error.message);
+    app.listen(PORT, () => console.log("Vitrine Certa API listening on " + PORT + "; database unavailable"));
+  });
