@@ -76,6 +76,13 @@ td,th{padding:14px 13px}th{background:#fff7fa}
  <div id="discoveryProductStatus" class="muted">A busca pode funcionar com palavras-chave mesmo quando não há ranking de vendas disponível.</div>
  <div id="discoveryProductResults" class="grid content" style="margin-top:12px"></div>
 </div>
+<div class="card" style="margin:14px 0">
+ <div class="eyebrow">FONTE 03 · RANKING COMERCIAL</div>
+ <h2>Mais vendidos do Mercado Livre</h2>
+ <p class="muted">Consulte o ranking oficial de produtos mais vendidos do Mercado Livre. Esta página é uma fonte comercial diferente das tendências de busca. O Mercado Livre bloqueou a leitura automatizada desta página nesta integração, então não exibiremos produtos ou posições sem confirmação.</p>
+ <div class="toolbar"><a class="btn primary" href="https://www.mercadolivre.com.br/mais-vendidos" target="_blank" rel="noopener">Abrir ranking oficial de mais vendidos</a><button class="btn" onclick="el('discoveryMarketplace').value='both';el('discoveryProductQuery').focus();el('discoveryProductQuery').scrollIntoView({behavior:'smooth',block:'center'});">Pesquisar um produto do ranking</button></div>
+ <div class="notice" style="margin-top:10px;margin-bottom:0">Fluxo: abra o ranking, escolha um produto e pesquise o nome dele na busca acima. Assim você compara ofertas nas duas plataformas sem confundir posição no ranking com preço, estoque ou comissão do seu link de afiliado.</div>
+</div>
 <div class="notice">Importante: o ranking abaixo é de tendências de busca, não um ranking de produtos vendidos. A Shopee não fornece uma classificação própria nesta integração; os mesmos termos são usados como sugestões de pesquisa, sem atribuir à Shopee um ranking que não foi consultado.</div>
 <div class="grid two" style="margin-top:14px">
  <div class="card"><div class="eyebrow">MARKETPLACE 01</div><h2>Shopee · Pesquisas prioritárias</h2><p class="muted">Abra cada termo na Shopee e compare os anúncios, avaliações e disponibilidade.</p><div id="shopeeTrendResults" class="grid content"></div></div>
