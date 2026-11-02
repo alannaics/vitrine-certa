@@ -76,7 +76,18 @@ function save(){localStorage.setItem("vitrineCerta",JSON.stringify(db));render()
 function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));let n={home:"Visão geral",products:"Produtos",discovery:"Garimpo feminino",calendar:"Plano de 30 dias",scripts:"Conteúdos prontos",results:"Resultados",settings:"Configurações"};el("title").textContent=n[id]}
 el("nav").onclick=e=>{let b=e.target.closest("button[data-page]");if(b)showPage(b.dataset.page)};
 function renderAiProducts(){const sel=el("aiProduct");if(!sel)return;const old=sel.value;sel.innerHTML=db.products.map((p,i)=>"<option value=\""+i+"\">"+safe(p.name)+"</option>").join("");if(old&&Number(old)<db.products.length)sel.value=old;}
-async function checkGemini(){const status=el("aiStatus");if(!status)return;try{const r=await fetch("/api/gemini/status");const d=await r.json();status.textContent=d.configured?"Gemini configurado. Pronto para gerar conteúdo.":"Gemini aguardando chave no servidor.";}catch(e){status.textContent="Não foi possível verificar a IA.";}}
+async function checkGemini(){
+ const status=el("aiStatus");if(!status)return;
+ try{
+  const token=el("dashboardToken")?.value.trim()||sessionStorage.getItem("vcDashboardToken")||"";
+  const r=await fetch("/api/gemini/status",{cache:"no-store",headers:{"x-dashboard-token":token}});
+  const d=await r.json().catch(()=>({}));
+  if(r.status===401){status.textContent="Token privado do painel ausente ou inválido. Abra Configurações e informe o token definido no Render.";return;}
+  if(r.status===503){status.textContent=d.error||"Configure a chave Gemini no Render.";return;}
+  if(!r.ok){status.textContent=d.error||"Não foi possível validar o acesso ao Gemini.";return;}
+  status.textContent=d.configured?"Gemini configurado. Acesso ao painel validado; geração será testada ao solicitar conteúdo.":"Gemini aguardando chave no servidor.";
+ }catch(e){status.textContent="Não foi possível verificar a IA: "+(e.message||"erro de conexão");}
+}
 async function generateWithGemini(){
  const status=el("aiStatus"),out=el("aiOutput"),p=db.products[Number(el("aiProduct").value)];
  const button=document.querySelector('button[onclick="generateWithGemini()"]');
@@ -175,7 +186,7 @@ async function makeShopeeLink(){
  catch(e){result.textContent=e.message;}
 }
 
-el("dashboardToken")?.addEventListener("input",e=>sessionStorage.setItem("vcDashboardToken",e.target.value));
+el("dashboardToken")?.addEventListener("input",e=>{sessionStorage.setItem("vcDashboardToken",e.target.value);checkGemini();});
 if(el("dashboardToken"))el("dashboardToken").value=sessionStorage.getItem("vcDashboardToken")||"";
 checkConnections();
 checkGemini();
