@@ -68,24 +68,18 @@ td,th{padding:14px 13px}th{background:#fff7fa}
 <div class="notice" style="margin-top:15px">Os índices são sinais de triagem, não previsão de vendas. Confirme preço, estoque, avaliações, vendedor e comissão diretamente nas plataformas antes de divulgar.</div></section>
 <section class="page" id="products"><h2>Banco de produtos</h2><p class="muted">O score combina sinais informados no cadastro e posição em tendências oficiais. Não prevê vendas nem substitui a conferência do anúncio.</p><div class="toolbar"><input class="field" id="search" placeholder="Buscar..." style="max-width:240px" oninput="renderProducts()"><select class="field" id="filter" style="max-width:190px" onchange="renderProducts()"><option value="">Todas as plataformas</option><option>Shopee</option><option>Mercado Livre</option></select><select class="field" id="stageFilter" style="max-width:220px" onchange="renderProducts()"><option value="">Todas as etapas</option><option value="Termo para pesquisar">Termo para pesquisar</option><option value="Anúncio encontrado">Anúncio encontrado</option><option value="Dados conferidos">Dados conferidos</option><option value="Pronto para divulgar">Pronto para divulgar</option></select><button class="btn primary" onclick="newProduct()">Adicionar</button></div><div class="tablewrap"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Plataforma</th><th>Preço</th><th>Validação</th><th>Score preliminar</th><th>Link afiliado</th><th></th></tr></thead><tbody id="productRows"></tbody></table></div></section>
 <section class="page" id="discovery">
-<div class="card daily-picks">
- <div class="daily-head"><div><div class="eyebrow">PESQUISAS PRIORITÁRIAS · PÚBLICO FEMININO</div><h2>5 oportunidades para pesquisar hoje</h2><p class="muted">Termos em tendência nas categorias de interesse feminino para orientar sua busca por anúncios.</p></div><button class="btn primary" id="refreshDailyPicks" onclick="loadDailyPicks(true)">↻ Atualizar seleção</button></div>
- <div class="daily-summary"><span id="dailyDate">Aguardando consulta</span><span id="dailyCount">—</span></div>
- <div id="dailyPicksStatus" class="muted" role="status">Carregando seleção diária...</div>
- <div id="dailyPicksChart" class="daily-chart" aria-label="Comparação das vendas exibidas"></div>
- <div id="dailyPicksResults" class="daily-products"></div>
- <p class="daily-footnote">Fonte: API oficial de tendências do Mercado Livre. A posição dos termos não representa volume de buscas, vendas ou conversão. A pesquisa de anúncios e a validação de preço, vendedor, avaliações, estoque e comissão ainda precisam ser feitas.</p>
+<div class="home-hero"><div><div class="eyebrow">CURADORIA DE PRODUTOS REAIS</div><h2>Encontre anúncios para divulgar</h2><p class="muted">Pesquisas separadas por marketplace. Os cards exibem apenas dados retornados pelas plataformas; comissão pode depender da sua conta de afiliado.</p></div></div>
+<div class="grid two">
+ <div class="card"><div class="daily-head"><div><div class="eyebrow">MARKETPLACE 01</div><h2>Shopee</h2><p class="muted">Produtos do catálogo oficial de afiliados, quando a API estiver configurada.</p></div><span class="pill">Shopee</span></div>
+ <div class="toolbar"><input class="field" id="shopeeProductQuery" value="bolsa feminina" placeholder="Ex.: bolsa feminina, skincare..." style="max-width:100%"><button class="btn primary" id="searchShopeeProducts" onclick="searchMarketplaceProducts('shopee')">Buscar produtos</button></div>
+ <div id="shopeeProductsStatus" class="muted">Pesquise produtos reais disponíveis na API de afiliados Shopee.</div><div id="shopeeProductsResults" class="grid content" style="margin-top:12px"></div>
+ </div>
+ <div class="card"><div class="daily-head"><div><div class="eyebrow">MARKETPLACE 02</div><h2>Mercado Livre</h2><p class="muted">Busca de produtos pelo catálogo oficial. A disponibilidade depende das permissões da API.</p></div><span class="pill">Mercado Livre</span></div>
+ <div class="toolbar"><input class="field" id="mlProductQuery" value="bolsa feminina" placeholder="Ex.: bolsa feminina, fone..." style="max-width:100%"><button class="btn primary" id="searchMlProducts" onclick="searchMarketplaceProducts('mercadolivre')">Buscar produtos</button></div>
+ <div id="mlProductsStatus" class="muted">Pesquise anúncios reais do Mercado Livre.</div><div id="mlProductsResults" class="grid content" style="margin-top:12px"></div>
+ </div>
 </div>
-<div class="card" style="margin-top:16px">
-<h2>Radar de oportunidades · Mercado Livre</h2>
-<div class="card">
-<h2>Radar de oportunidades · Mercado Livre</h2>
-<p class="muted">Monitore termos em alta para orientar sua pesquisa de anúncios em moda, beleza, acessórios, casa e tecnologia. Tendências de busca não comprovam vendas.</p>
-<div class="toolbar"><button class="btn primary" id="runDiscovery" onclick="runDiscovery()">Atualizar tendências</button><span id="discoveryStatus" class="muted">Consulte os termos populares e use-os como ponto de partida para pesquisar anúncios reais.</span></div>
-<div class="notice">Importante: esta etapa identifica termos de busca, não produtos vendidos. Antes de cadastrar uma oportunidade, abra anúncios e confira preço final, vendas exibidas, avaliação, vendedor, estoque e comissão.</div>
-<div class="toolbar"><input class="field" id="discoverySearch" placeholder="Filtrar termos..." style="max-width:260px" oninput="renderDiscoveryCards()"><select class="field" id="discoveryCategory" style="max-width:220px" onchange="renderDiscoveryCards()"><option value="">Todas as categorias</option><option>Beleza</option><option>Moda e acessórios</option><option>Casa e organização</option><option>Tecnologia</option><option>Interesse feminino</option></select><select class="field" id="discoverySort" style="max-width:190px" onchange="renderDiscoveryCards()"><option value="rank">Maior tendência primeiro</option><option value="alpha">Ordem alfabética</option><option value="category">Categoria</option></select></div>
-</div>
-<div id="discoveryResults" class="grid content" style="margin-top:14px"></div>
+<div class="notice" style="margin-top:14px">A curadoria não estima vendas nem inventa comissão. Quando a API não fornecer um dado, ele será indicado como não disponível. Confirme preço, frete, vendedor e condições do link antes de divulgar.</div>
 </section>
 <section class="page" id="calendar"><div class="notice">Calendário inicial de 30 dias. Marque o andamento e adapte os temas aos produtos que realmente validou.</div><div class="grid calendar" id="days"></div></section>
 <section class="page" id="scripts"><div class="card" style="margin-bottom:14px"><h2>Gerador de conteúdo com IA — Gemini</h2><p class="muted">Gere um pacote de gravação: roteiro completo, storyboard cena a cena, textos na tela, narração, SEO para TikTok/Reels/Shorts, legenda e CTA. Você grava e edita; a plataforma entrega o planejamento escrito. Confira os dados antes de publicar.</p><div class="form"><label class="wide">Produto<select class="field" id="aiProduct"></select></label><label>Formato<select class="field" id="aiFormat"><option>Pacote completo: roteiro + storyboard + SEO</option><option>Roteiro para vídeo curto</option><option>Legenda para Instagram</option><option>Sequência de Stories</option><option>Status para WhatsApp</option><option>Texto para TikTok</option><option>Descrição para lista de ofertas</option></select></label><label>Detalhes extras<input class="field" id="aiDetails" placeholder="Público, tom, benefício verificado..."></label><button class="btn primary wide" onclick="generateWithGemini()">Gerar com Gemini</button><div id="aiStatus" class="wide muted">Verificando conexão com a IA...</div><label class="wide">Pacote de campanha gerado<textarea class="field" id="aiOutput" rows="16" placeholder="O pacote aparecerá organizado em: roteiro, storyboard cena a cena, SEO por plataforma, legenda, CTA e checklist."></textarea></label><button class="btn wide" onclick="copyAiOutput()">Copiar conteúdo</button></div></div><h2>Biblioteca de conteúdo</h2><p class="muted">Copie e personalize antes de publicar. Não afirme que testou um produto se não testou.</p><div class="grid content" id="scriptCards"></div><div class="card" style="margin-top:16px"><h2>Histórico de campanhas</h2><p class="muted">Os pacotes gerados ficam salvos no painel e sincronizados com o banco quando a conexão está disponível.</p><div id="campaignHistory" class="grid content"></div></div></section>
@@ -187,7 +181,7 @@ async function loadDashboardState(){
   if(status)status.textContent="Banco indisponível. Seus dados continuam preservados neste navegador.";
  }
 }
-function showPage(id){if(id==="discovery")setTimeout(()=>loadDailyPicks(),0);document.querySelectorAll(".page").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));let n={home:"Visão geral",products:"Produtos",discovery:"Inteligência de produtos",calendar:"Plano de 30 dias",scripts:"Conteúdos prontos",results:"Resultados",settings:"Configurações"};el("title").textContent=n[id]}
+function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));let n={home:"Visão geral",products:"Produtos",discovery:"Inteligência de produtos",calendar:"Plano de 30 dias",scripts:"Conteúdos prontos",results:"Resultados",settings:"Configurações"};el("title").textContent=n[id]}
 el("nav").onclick=e=>{let b=e.target.closest("button[data-page]");if(b)showPage(b.dataset.page)};
 function renderAiProducts(){const sel=el("aiProduct");if(!sel)return;const old=sel.value;sel.innerHTML=db.products.map((p,i)=>"<option value=\""+i+"\">"+safe(p.name)+"</option>").join("");if(old&&Number(old)<db.products.length)sel.value=old;}
 async function checkGemini(){
@@ -244,36 +238,50 @@ async function generateWithGemini(){
 function copyAiOutput(){const t=el("aiOutput").value;if(!t){alert("Gere um conteúdo primeiro.");return;}navigator.clipboard.writeText(t).then(()=>alert("Conteúdo copiado.")).catch(()=>{el("aiOutput").select();document.execCommand("copy");alert("Conteúdo copiado.");});}
 
 
-function formatDailySales(value){return Number(value||0).toLocaleString("pt-BR");}
-async function loadDailyPicks(force=false){
- const status=el("dailyPicksStatus"),button=el("refreshDailyPicks"),cards=el("dailyPicksResults"),chart=el("dailyPicksChart");
- if(!status||!cards)return;
- if(!force&&dailyPicksLoadedDate)return;
- if(button)button.disabled=true;
- status.textContent="Consultando tendências oficiais para selecionar cinco pesquisas prioritárias...";
- cards.innerHTML="";chart.innerHTML="";
+async function searchMarketplaceProducts(platform){
+ const shopee=platform==="shopee";
+ const input=el(shopee?"shopeeProductQuery":"mlProductQuery");
+ const status=el(shopee?"shopeeProductsStatus":"mlProductsStatus");
+ const results=el(shopee?"shopeeProductsResults":"mlProductsResults");
+ const button=el(shopee?"searchShopeeProducts":"searchMlProducts");
+ const keyword=(input?.value||"").trim();
+ if(!keyword){status.textContent="Digite o nome de um produto para pesquisar.";return;}
+ button.disabled=true;status.textContent="Buscando produtos reais na "+(shopee?"Shopee":"API do Mercado Livre")+"...";results.innerHTML="";
  try{
-  const r=await fetch("/api/mercadolivre/discovery",{cache:"no-store"}),d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.error||"Não foi possível consultar as tendências.");
-  dailyPicksLoadedDate=d.updatedAt||new Date().toISOString();
-  const terms=(d.products||[]).slice(0,5);
-  dailyPickItems=terms;
-  el("dailyDate").textContent="Atualizado em "+new Date(d.updatedAt||Date.now()).toLocaleString("pt-BR");
-  el("dailyCount").textContent=terms.length+" de 5 pesquisas";
-  status.textContent=terms.length
-   ?"Cinco termos prioritários encontrados nas tendências oficiais. Eles são pontos de partida para pesquisar anúncios, não produtos ou vendas confirmadas."
-   :"A API não retornou termos suficientes nesta atualização.";
-  chart.innerHTML=terms.map((p,i)=>'<div class="daily-bar"><strong>#'+(i+1)+'</strong><div class="daily-bar-fill" style="height:'+Math.max(12,70-i*10)+'px"></div><small>'+safe(p.category||"Pesquisa")+'</small></div>').join("");
-  cards.innerHTML=terms.map((p,i)=>'<article class="daily-product"><div class="daily-product-top"><span class="daily-rank">PESQUISA #'+(i+1)+'</span><span class="muted" style="font-size:10px">Tendência oficial</span></div><h3>'+safe(p.title)+'</h3><div class="daily-product-meta"><span>'+safe(p.category||"Interesse geral")+'</span><span>Não é anúncio validado</span></div><div class="toolbar"><a class="btn" target="_blank" rel="noopener" href="'+safe(p.permalink||("https://lista.mercadolivre.com.br/"+encodeURIComponent(p.title)))+'">Pesquisar anúncios</a><button class="btn primary" onclick="saveDailyPick('+i+')">Salvar pesquisa</button></div></article>').join("");
- }catch(e){
-  status.textContent=e.message;el("dailyDate").textContent="Não atualizado";el("dailyCount").textContent="—";
- }finally{if(button)button.disabled=false;}
+  const url=shopee?"/api/shopee/products?keyword="+encodeURIComponent(keyword)+"&limit=20":"/api/mercadolivre/products?q="+encodeURIComponent(keyword);
+  const headers={};const token=el("dashboardToken")?.value.trim()||sessionStorage.getItem("vcDashboardToken")||"";
+  if(shopee)headers["x-dashboard-token"]=token;
+  const r=await fetch(url,{cache:"no-store",headers}),d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||"A plataforma respondeu HTTP "+r.status+".");
+  const items=shopee?(d.nodes||[]):(d.products||[]);
+  if(!items.length){status.textContent="A plataforma não retornou produtos para esta pesquisa.";return;}
+  status.textContent=items.length+" produtos retornados pela "+(shopee?"API de afiliados Shopee":"API do Mercado Livre")+".";
+  results.innerHTML=items.map((p,i)=>{
+   const name=p.productName||p.title||p.name||"Produto sem título";
+   const price=p.priceMin??p.price??p.price_max??null;
+   const image=p.imageUrl||p.thumbnail||p.pictures?.[0]?.url||"";
+   const href=p.offerLink||p.productLink||p.permalink||"";
+   const rating=p.ratingStar??p.rating??null;
+   const sold=p.sales??p.sold_quantity??null;
+   const commission=p.commissionRate??p.commission??null;
+   return '<article class="discovery-card">'+(image?'<img src="'+safe(image)+'" alt="" style="width:100%;height:145px;object-fit:contain;border-radius:10px;background:#fff7fa">':'')+
+    '<h3>'+safe(name)+'</h3><div class="daily-product-price">'+(price!==null?"R$ "+Number(price).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"Preço não informado")+'</div>'+
+    '<div class="discovery-meta">'+(rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+' · '+(sold!==null?"Vendas exibidas: "+safe(sold):"Vendas não informadas")+'</div>'+
+    '<div class="discovery-meta">'+(commission!==null?"Comissão retornada: "+safe(commission):"Comissão não disponível nesta consulta")+'</div>'+
+    '<div class="toolbar">'+(href?'<a class="btn" href="'+safe(href)+'" target="_blank" rel="noopener">Abrir produto</a>':'')+
+    '<button class="btn primary" onclick="saveMarketplaceProduct('+JSON.stringify(platform)+','+i+')">Salvar no catálogo</button></div></article>';
+  }).join("");
+  window.marketplaceSearchResults=window.marketplaceSearchResults||{};window.marketplaceSearchResults[platform]=items;
+ }catch(e){status.textContent=e.message;}
+ finally{button.disabled=false;}
 }
-function saveDailyPick(i){
- const p=dailyPickItems[i];if(!p)return;
- if(db.products.some(x=>x.sourceId===String(p.id))){alert("Esta pesquisa já está no catálogo.");return;}
- db.products.unshift({name:p.title,category:p.category||"Interesse geral",platform:"Mercado Livre",price:"",rate:"",link:"",stage:"Termo para pesquisar",notes:"Termo de tendência oficial. Ainda não é anúncio validado nem comprova vendas. Pesquise anúncios e confira preço, vendedor, avaliações, estoque e comissão.",sourceId:String(p.id),sourceType:"mercadolivre_weekly_trend",trendScore:p.trendScore,trendRank:p.trendRank,trendUpdatedAt:new Date().toISOString()});
- save();showPage("products");alert("Pesquisa salva no catálogo. Encontre um anúncio específico e valide os dados antes de divulgar.");
+function saveMarketplaceProduct(platform,index){
+ const p=(window.marketplaceSearchResults||{})[platform]?.[index];if(!p)return;
+ const name=p.productName||p.title||p.name||"Produto";
+ const item={name,category:p.category||"Não informada",platform:platform==="shopee"?"Shopee":"Mercado Livre",price:String(p.priceMin??p.price??""),rate:String(p.commissionRate??p.commission??""),link:p.offerLink||p.productLink||p.permalink||"",rating:p.ratingStar??p.rating??"",soldQuantity:p.sales??p.sold_quantity??"",stage:"Anúncio encontrado",verifiedAt:new Date().toISOString().slice(0,10),notes:"Importado da consulta da API da plataforma. Confira os dados e o link de afiliado antes de divulgar.",sourceId:String(p.itemId||p.id||p.productId||platform+"-"+Date.now())};
+ const exists=db.products.some(x=>x.sourceId===item.sourceId&&x.platform===item.platform);
+ if(exists){alert("Este produto já está no catálogo.");return;}
+ db.products.unshift(item);save();alert("Produto salvo no catálogo. Confira os dados e complete o link de afiliado, se necessário.");
 }
 let discoveryItems=[];
 async function runDiscovery(){
