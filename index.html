@@ -373,7 +373,7 @@ function renderDiscoveryProductCards(){
  const target=el("discoveryProductCards");if(!target)return;
  const all=(window.discoveryProductResults||[]).slice();
  const sort=el("discoverySort")?.value||"relevance";
- const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null;};
+ const num=v=>{if(v===null||v===undefined||v==="")return null;const n=Number(v);return Number.isFinite(n)?n:null;};
  const tokens=(el("discoveryProductQuery")?.value||"").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").split(/[^a-z0-9]+/).filter(x=>x.length>2);
  const score=p=>{const title=(p.productName||p.title||p.name||"").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"");return tokens.length?tokens.filter(t=>title.includes(t)).length/tokens.length:0;};
  all.sort((a,b)=>{
