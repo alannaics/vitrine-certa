@@ -335,15 +335,23 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
     const details = String(req.body?.details || "").slice(0, 1000);
     if (!product) return res.status(400).json({ error: "Selecione ou informe um produto." });
     const prompt = [
-      "Você é redator de marketing de afiliados para a Vitrine Certa, no Brasil.",
-      "Crie conteúdo em português brasileiro, natural, objetivo e persuasivo, sem promessas enganosas.",
-      "Não invente avaliações, vendas, características, descontos, escassez ou resultados. Use apenas os dados fornecidos; se faltarem, recomende conferir no anúncio.",
-      "Inclua chamada para ação e aviso transparente de link de afiliado. Informe que preço e estoque podem mudar.",
-      "Formato solicitado: " + format,
+      "Você é estrategista sênior de conteúdo e SEO para marketing de afiliados no Brasil, trabalhando para a Vitrine Certa.",
+      "Entregue um pacote pronto para a pessoa gravar e editar o vídeo por conta própria. NÃO gere vídeo, não prometa edição nem publicação automática.",
+      "Escreva em português brasileiro, com linguagem natural, específica, persuasiva e sem exageros. Evite introduções genéricas.",
+      "Não invente características, avaliações, vendas, descontos, preço, comissão, estoque, escassez, resultados ou experiência de uso. Use apenas os dados fornecidos; quando faltarem, indique claramente o que precisa ser conferido no anúncio.",
+      "Organize obrigatoriamente a resposta com estas seções e nesta ordem:",
+      "1. ÂNGULO E OBJETIVO: público provável, necessidade atendida, promessa editorial realista e objetivo do conteúdo.",
+      "2. ROTEIRO DE GRAVAÇÃO: duração sugerida, gancho nos primeiros 2 segundos, falas/narração completas, desenvolvimento, demonstração e CTA. Diferencie fala de texto na tela.",
+      "3. STORYBOARD CENA A CENA: tabela com tempo de início/fim, duração, enquadramento/plano, o que a pessoa deve filmar, ação/movimento de câmera, texto na tela, narração/fala e áudio/efeito sugerido. Planeje cenas graváveis com celular; não dependa de imagens inexistentes.",
+      "4. SEO POR PLATAFORMA: criar opções específicas para TikTok, Instagram Reels e YouTube Shorts. Para cada uma, fornecer título/gancho pesquisável, descrição otimizada, palavra-chave principal, palavras-chave secundárias e hashtags relevantes. Não repetir cegamente o mesmo texto entre plataformas.",
+      "5. LEGENDA E CTA: legenda pronta para copiar, chamada para ação e aviso transparente de link de afiliado.",
+      "6. CHECKLIST ANTES DE PUBLICAR: dados do produto a conferir, alegações que não devem ser feitas sem comprovação e adequação do link.",
+      "Use termos de busca naturais e intenção de compra; não faça keyword stuffing nem prometa viralização ou ranking. Hashtags devem ser poucas e pertinentes.",
+      "Formato ou plataforma priorizada: " + format,
       "Produto: " + product,
       "Preço informado: " + (price || "não informado"),
       "Link de afiliado: " + (link || "não informado"),
-      "Informações adicionais: " + (details || "nenhuma")
+      "Informações adicionais verificadas: " + (details || "nenhuma")
     ].join("\n");
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", {
       method: "POST",
