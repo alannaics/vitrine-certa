@@ -340,13 +340,25 @@ async function searchDiscoveryProducts(){
     '<div class="discovery-meta">'+(price!==null?"Preço informado: R$ "+Number(price).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"Preço não informado")+'</div>'+
     '<div class="discovery-meta">'+(sales!==undefined&&sales!==null?"Vendas informadas: "+safe(sales):"Vendas não informadas")+' · '+(rating!==undefined&&rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+'</div>'+
     '<div class="discovery-meta">'+(commission!==undefined&&commission!==null?"Comissão informada: "+safe(commission):"Comissão não informada")+'</div>'+
-    '<div class="toolbar">'+(link?'<a class="btn" href="'+safe(link)+'" target="_blank" rel="noopener">Abrir resultado</a>':'')+'</div></article>';
+    '<div class="discovery-meta">'+(p.shopName||p.sellerName?"Vendedor: "+safe(p.shopName||p.sellerName):"Vendedor não informado")+'</div>'+
+    '<div class="toolbar">'+(link?'<a class="btn" href="'+safe(link)+'" target="_blank" rel="noopener">Abrir oferta</a>':'')+
+    '<button class="btn primary" onclick="saveDiscoveryProduct('+all.indexOf(p)+')">Salvar no catálogo</button></div></article>';
   }));
   results.innerHTML=cards.join("");
   const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);
   status.textContent=all.length+" resultado(s) listado(s) para \""+query+"\". "+groups.filter(g=>g.items.length).map(g=>g.market+": "+g.items.length).join(" · ")+(errors.length?" | Indisponível: "+errors.join(" | "):"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
  }catch(e){status.textContent=e.message;}
  finally{button.disabled=false;}
+}
+function saveDiscoveryProduct(index){
+ const p=(window.discoveryProductResults||[])[index];if(!p)return;
+ const platform=p.shopName||p.itemId||p.offerLink||p.productLink?"Shopee":"Mercado Livre";
+ const name=p.productName||p.title||p.name||"Produto";
+ const sourceId=String(p.itemId||p.id||p.catalogId||p.productId||p.offerLink||p.permalink||platform+"-"+Date.now());
+ const item={name,category:p.category||"Não informada",platform,price:String(p.priceMin??p.price??""),rate:String(p.commissionRate??p.commission??""),link:p.offerLink||p.productLink||p.permalink||"",rating:String(p.ratingStar??p.rating??""),soldQuantity:String(p.sales??p.sold_quantity??""),freeShipping:p.shipping?.free_shipping?"yes":"",stage:p.resultType==="active"?"Anúncio ativo":p.resultType==="catalog"?"Catálogo · vendedor não confirmado":"Oferta encontrada",verifiedAt:new Date().toISOString().slice(0,10),notes:[p.shopName||p.sellerName?"Vendedor: "+(p.shopName||p.sellerName):"",p.offerLink?"Link de oferta retornado pela API.":p.permalink?"Link comum do produto; ainda não é link de afiliado.":"Link não informado.",p.resultType==="catalog"?"A API retornou item de catálogo, sem confirmar vendedor/estoque.":""].filter(Boolean).join(" "),sourceId};
+ const exists=db.products.some(x=>x.sourceId===item.sourceId&&x.platform===item.platform);
+ if(exists){alert("Esta oferta já está no catálogo.");return;}
+ db.products.unshift(item);save();alert("Oferta salva no catálogo. Se o link salvo for comum, adicione seu link de afiliado ao editar o produto.");
 }
 let discoveryItems=[];
 async function runDiscovery(){
