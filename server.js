@@ -211,7 +211,7 @@ app.get("/api/mercadolivre/products", async (req, res) => {
     if (!query) return res.status(400).json({ error: "Informe o nome do produto para pesquisar." });
     const token = await ensureMlToken();
     const url = new URL("https://api.mercadolibre.com/products/search");
-    url.search = new URLSearchParams({ site_id: "MLB", q: query, limit: "20" }).toString();
+    url.search = new URLSearchParams({ site_id: "MLB", q: query, limit: "50" }).toString();
     const response = await fetch(url, {
       headers: { Accept: "application/json", Authorization: "Bearer " + token, "User-Agent": "VitrineCerta/1.0 (product catalog search)" }
     });
@@ -222,24 +222,42 @@ app.get("/api/mercadolivre/products", async (req, res) => {
       throw error;
     }
     const raw = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
-    const products = raw.map(item => {
+    const candidates = raw.map(item => {
       const winner = item.buy_box_winner || item.buyBoxWinner || {};
-      const price = winner.price ?? item.price ?? item.price_info?.price;
+      const itemId = winner.item_id || winner.id || item.item_id || (String(item.id || "").startsWith("MLB") ? item.id : null);
       const pictures = item.pictures || item.main_picture || [];
       const picture = Array.isArray(pictures) ? pictures[0]?.url || pictures[0]?.secure_url : pictures?.url || pictures?.secure_url;
-      return {
-        id: item.id || winner.item_id || winner.id || null,
-        title: item.name || item.title || winner.title || "",
-        price: price == null ? null : Number(price),
-        permalink: winner.permalink || item.permalink || (item.id ? "https://www.mercadolivre.com.br/p/" + item.id : ""),
+      return { catalogId: item.id || null, itemId, title: item.name || item.title || winner.title || "",
+        price: winner.price ?? item.price ?? item.price_info?.price ?? null,
+        permalink: winner.permalink || item.permalink || "",
         thumbnail: picture || winner.thumbnail || null,
         rating: item.rating?.average ?? winner.rating_average ?? null,
-        sold_quantity: winner.sold_quantity ?? item.sold_quantity ?? null,
-        category: item.domain_id || item.category_id || "Mercado Livre",
-        platform: "Mercado Livre"
-      };
-    }).filter(item => item.title && item.permalink);
-    res.json({ products, count: products.length, source: "API oficial de catálogo do Mercado Livre", updatedAt: new Date().toISOString() });
+        category: item.domain_id || item.category_id || "Mercado Livre" };
+    }).filter(item => item.title && item.itemId);
+    const checked = await Promise.allSettled(candidates.slice(0, 30).map(async item => {
+      const detailResponse = await fetch("https://api.mercadolibre.com/items/" + encodeURIComponent(item.itemId), {
+        headers: { Accept: "application/json", Authorization: "Bearer " + token, "User-Agent": "VitrineCerta/1.0 (availability validation)" }
+      });
+      const detail = await detailResponse.json().catch(() => ({}));
+      if (!detailResponse.ok) return null;
+      if (detail.status !== "active" || Number(detail.available_quantity || 0) <= 0) return null;
+      return { ...item, id: detail.id, title: detail.title || item.title,
+        price: Number(detail.price ?? item.price) || null,
+        permalink: detail.permalink || item.permalink || "",
+        thumbnail: detail.thumbnail || item.thumbnail || null,
+        sold_quantity: Number(detail.sold_quantity) || 0,
+        available_quantity: Number(detail.available_quantity) || 0,
+        condition: detail.condition || null, listing_status: detail.status,
+        rating: item.rating ?? detail.reviews?.rating_average ?? null,
+        category: detail.category_id || item.category };
+    }));
+    const products = checked.filter(x => x.status === "fulfilled" && x.value && x.value.permalink)
+      .map(x => x.value)
+      .sort((a,b) => b.sold_quantity-a.sold_quantity);
+    res.json({ products, count: products.length, checked: checked.length,
+      source: "API oficial de catálogo e anúncios do Mercado Livre",
+      ranking: "Anúncios ativos com estoque disponível, ordenados por sold_quantity decrescente.",
+      availabilityVerified: true, updatedAt: new Date().toISOString() });
   } catch (error) {
     console.error("[mercadolivre-products]", error.message);
     res.status(error.status === 401 || error.status === 403 ? error.status : 502).json({
