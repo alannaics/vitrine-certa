@@ -170,7 +170,8 @@ const sample=[
 {name:"Suporte articulado para celular",category:"Acessórios",platform:"Mercado Livre",price:"",rate:"",link:"",notes:"Candidato: testar estabilidade e compatibilidade."}
 ];
 let db=JSON.parse(localStorage.getItem("vitrineCerta")||"null")||{products:sample,metrics:{clicks:0,sales:0,commission:0,period:""},calendar:{},settings:{},campaigns:[]},editing=-1;
-db.campaigns=Array.isArray(db.campaigns)?db.campaigns:[];\ndb.metricEntries=Array.isArray(db.metricEntries)?db.metricEntries:[];
+db.campaigns=Array.isArray(db.campaigns)?db.campaigns:[];
+db.metricEntries=Array.isArray(db.metricEntries)?db.metricEntries:[];
 let persistenceReady=false,persistenceTimer=null;
 const el=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),safe=s=>String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function save(){
@@ -212,8 +213,7 @@ async function loadDashboardState(){
  }
 }
 function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));let n={home:"Visão geral",products:"Produtos",discovery:"Inteligência de produtos",calendar:"Plano de 30 dias",scripts:"Conteúdos prontos",results:"Resultados",roadmap:"Etapas do projeto",settings:"Configurações"};el("title").textContent=n[id]}
-el("nav").onclick=e=>{let b=e.target.closest("button[data-page]");if(b){e.preventDefault();showPage(b.dataset.page)}};
-document.querySelectorAll("#nav button[data-page]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
+el("nav").addEventListener("click",e=>{const b=e.target.closest("button[data-page]");if(!b||!el("nav").contains(b))return;e.preventDefault();e.stopPropagation();showPage(b.dataset.page);});
 function renderAiProducts(){const sel=el("aiProduct");if(!sel)return;const old=sel.value;sel.innerHTML=db.products.map((p,i)=>"<option value=\""+i+"\">"+safe(p.name)+"</option>").join("");if(old&&Number(old)<db.products.length)sel.value=old;}
 async function checkGemini(){
  const status=el("aiStatus");if(!status)return;
@@ -459,7 +459,8 @@ function productQuality(p){
  add(p.category?5:0,Boolean(p.category),"categoria");
  return {score:Math.min(100,score),signals,checks,confidence:Math.round(signals/9*100)};
 }
-function renderProducts(){\n renderMetrics();
+function renderProducts(){
+ renderMetrics();
  let q=(el("search")?.value||"").toLowerCase(),f=el("filter")?.value||"",stage=el("stageFilter")?.value||"";
  let a=db.products.map((p,i)=>({p,i,quality:productQuality(p)})).filter(x=>(x.p.name+" "+x.p.category).toLowerCase().includes(q)&&(!f||x.p.platform===f)&&(!stage||(x.p.stage||"Termo para pesquisar")===stage)).sort((x,y)=>y.quality.score-x.quality.score);
  el("productRows").innerHTML=a.length?a.map(x=>'<tr><td><b>'+safe(x.p.name)+'</b><br><small>'+safe(x.p.notes)+'</small></td><td>'+safe(x.p.category)+'</td><td>'+safe(x.p.platform)+'</td><td>'+(x.p.price?fmt(x.p.price):"Pendente")+'</td><td><span class="pill">'+safe(x.p.stage||"Termo para pesquisar")+'</span></td><td><b>'+x.quality.score+'/100</b><br><small>'+x.quality.signals+'/9 sinais · '+x.quality.confidence+'% preenchido</small><br><small>'+safe(x.quality.checks.length?'Falta: '+x.quality.checks.join(', '):'Dados preenchidos; confira a fonte')+'</small></td><td>'+(x.p.link?'<a target="_blank" rel="noopener" href="'+safe(x.p.link)+'">Abrir link</a>':"Não cadastrado")+'</td><td><button class="btn" onclick="editProduct('+x.i+')">Editar</button> <button class="btn" onclick="removeProduct('+x.i+')">Excluir</button></td></tr>').join(""):'<tr><td colspan="8">Nenhum produto corresponde aos filtros.</td></tr>';
