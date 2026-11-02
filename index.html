@@ -327,30 +327,42 @@ async function searchDiscoveryProducts(){
  try{
   const groups=await Promise.all(jobs);const all=groups.flatMap(g=>g.items.map(p=>({...p,_market:g.market})));
   window.discoveryProductResults=all;
-  const cards=all.map((p,index)=>{
-   const marketName=p._market||"Marketplace";
-   const name=p.productName||p.title||p.name||"Produto sem título";
-   const price=p.priceMin??p.price??null;
-   const image=p.imageUrl||p.thumbnail||"";
-   const link=p.offerLink||p.productLink||p.permalink||"";
-   const sales=p.sales??p.sold_quantity;
-   const rating=p.ratingStar??p.rating;
-   const commission=p.commissionRate??p.commissionRate??p.commission;
-   const state=p.resultType==="active"?"Anúncio ativo · estoque confirmado":p.resultType==="catalog"?"Resultado de catálogo · anúncio/estoque não confirmados":"Oferta retornada pela API de afiliados";
-   return '<article class="discovery-card">'+(image?'<img src="'+safe(image)+'" alt="" style="width:100%;height:145px;object-fit:contain;border-radius:10px;background:#fff7fa">':'')+
-    '<span class="pill">'+safe(marketName)+' · '+state+'</span><h3>'+safe(name)+'</h3>'+
-    '<div class="discovery-meta">'+(price!==null?"Preço informado: R$ "+Number(price).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"Preço não informado")+'</div>'+
-    '<div class="discovery-meta">'+(sales!==undefined&&sales!==null?"Vendas informadas: "+safe(sales):"Vendas não informadas")+' · '+(rating!==undefined&&rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+'</div>'+
-    '<div class="discovery-meta">'+(commission!==undefined&&commission!==null?"Comissão informada: "+safe(commission):"Comissão não informada")+'</div>'+
-    '<div class="discovery-meta">'+(p.shopName||p.sellerName?"Vendedor: "+safe(p.shopName||p.sellerName):"Vendedor não informado")+'</div>'+
-    '<div class="toolbar">'+(link?'<a class="btn" href="'+safe(link)+'" target="_blank" rel="noopener">Abrir oferta</a>':'')+
-    '<button class="btn primary" onclick="saveDiscoveryProduct('+index+')">Salvar no catálogo</button></div></article>';
-  });
-  results.innerHTML=cards.join("");
+  results.innerHTML='<div class="toolbar" style="margin:10px 0"><label for="discoverySort">Ordenar resultados:</label><select id="discoverySort" onchange="renderDiscoveryProductCards()"><option value="relevance">Relevância</option><option value="price">Menor preço</option><option value="sales">Mais vendidos (quando informado)</option><option value="rating">Melhor avaliação</option><option value="commission">Maior comissão informada</option></select></div><div id="discoveryProductCards" class="discovery-grid"></div>';
+  renderDiscoveryProductCards();
   const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);
   status.textContent=all.length+" resultado(s) listado(s) para \""+query+"\". "+groups.filter(g=>g.items.length).map(g=>g.market+": "+g.items.length).join(" · ")+(errors.length?" | Indisponível: "+errors.join(" | "):"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
  }catch(e){status.textContent=e.message;}
  finally{button.disabled=false;}
+}
+function renderDiscoveryProductCards(){
+ const target=el("discoveryProductCards");if(!target)return;
+ const all=(window.discoveryProductResults||[]).slice();
+ const sort=el("discoverySort")?.value||"relevance";
+ const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null;};
+ const tokens=(el("discoveryProductQuery")?.value||"").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").split(/[^a-z0-9]+/).filter(x=>x.length>2);
+ const score=p=>{const title=(p.productName||p.title||p.name||"").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"");return tokens.length?tokens.filter(t=>title.includes(t)).length/tokens.length:0;};
+ all.sort((a,b)=>{
+  if(sort==="price")return (num(a.priceMin??a.price)??Infinity)-(num(b.priceMin??b.price)??Infinity);
+  if(sort==="sales")return (num(b.sales??b.sold_quantity)??-1)-(num(a.sales??a.sold_quantity)??-1);
+  if(sort==="rating")return (num(b.ratingStar??b.rating)??-1)-(num(a.ratingStar??a.rating)??-1);
+  if(sort==="commission")return (num(b.commissionRate??b.commission)??-1)-(num(a.commissionRate??a.commission)??-1);
+  return score(b)-score(a);
+ });
+ window.discoveryProductResults=all;
+ target.innerHTML=all.map((p,index)=>{
+  const marketName=p._market||"Marketplace",name=p.productName||p.title||p.name||"Produto sem título";
+  const price=p.priceMin??p.price??null,image=p.imageUrl||p.thumbnail||"",link=p.offerLink||p.productLink||p.permalink||"";
+  const sales=p.sales??p.sold_quantity,rating=p.ratingStar??p.rating,commission=p.commissionRate??p.commission;
+  const state=p.resultType==="active"?"Anúncio ativo · estoque confirmado":p.resultType==="catalog"?"Resultado de catálogo · anúncio/estoque não confirmados":"Oferta retornada pela API de afiliados";
+  return '<article class="discovery-card">'+(image?'<img src="'+safe(image)+'" alt="" style="width:100%;height:145px;object-fit:contain;border-radius:10px;background:#fff7fa">':'')+
+   '<span class="pill">'+safe(marketName)+' · '+state+'</span><h3>'+safe(name)+'</h3>'+
+   '<div class="discovery-meta">'+(price!==null?"Preço informado: R$ "+Number(price).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"Preço não informado")+'</div>'+
+   '<div class="discovery-meta">'+(sales!==undefined&&sales!==null?"Vendas informadas: "+safe(sales):"Vendas não informadas")+' · '+(rating!==undefined&&rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+'</div>'+
+   '<div class="discovery-meta">'+(commission!==undefined&&commission!==null?"Comissão informada: "+safe(commission):"Comissão não informada")+'</div>'+
+   '<div class="discovery-meta">'+(p.shopName||p.sellerName?"Vendedor: "+safe(p.shopName||p.sellerName):"Vendedor não informado")+'</div>'+
+   '<div class="toolbar">'+(link?'<a class="btn" href="'+safe(link)+'" target="_blank" rel="noopener">Abrir oferta</a>':'')+
+   '<button class="btn primary" onclick="saveDiscoveryProduct('+index+')">Salvar no catálogo</button></div></article>';
+ }).join("");
 }
 function saveDiscoveryProduct(index){
  const p=(window.discoveryProductResults||[])[index];if(!p)return;
