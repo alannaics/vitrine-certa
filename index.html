@@ -254,8 +254,8 @@ async function searchMarketplaceProducts(platform){
   const r=await fetch(url,{cache:"no-store",headers}),d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(d.error||"A plataforma respondeu HTTP "+r.status+".");
   const items=shopee?(d.nodes||[]):(d.products||[]);
-  if(!items.length){status.textContent="A plataforma não retornou produtos para esta pesquisa.";return;}
-  status.textContent=items.length+" produtos retornados pela "+(shopee?"API de afiliados Shopee":"API do Mercado Livre")+".";
+  if(!items.length){status.textContent="Nenhum produto com vendas informadas e critérios disponíveis foi encontrado. Tente outro termo.";return;}
+  status.textContent=items.length+" produtos com vendas informadas, ordenados do maior para o menor. "+(shopee?"A Shopee não informa estoque confiável nesta consulta; confirme no anúncio.":"Anúncios ativos e com estoque disponível foram validados pela API.");
   results.innerHTML=items.map((p,i)=>{
    const name=p.productName||p.title||p.name||"Produto sem título";
    const price=p.priceMin??p.price??p.price_max??null;
@@ -263,10 +263,12 @@ async function searchMarketplaceProducts(platform){
    const href=p.offerLink||p.productLink||p.permalink||"";
    const rating=p.ratingStar??p.rating??null;
    const sold=p.sales??p.sold_quantity??null;
+   const stock=p.available_quantity??p.stock??null;
    const commission=p.commissionRate??p.commission??null;
    return '<article class="discovery-card">'+(image?'<img src="'+safe(image)+'" alt="" style="width:100%;height:145px;object-fit:contain;border-radius:10px;background:#fff7fa">':'')+
     '<h3>'+safe(name)+'</h3><div class="daily-product-price">'+(price!==null?"R$ "+Number(price).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"Preço não informado")+'</div>'+
-    '<div class="discovery-meta">'+(rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+' · '+(sold!==null?"Vendas exibidas: "+safe(sold):"Vendas não informadas")+'</div>'+
+    '<div class="discovery-meta">'+(rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+' · '+(sold!==null?"Vendas informadas: "+safe(sold):"Vendas não informadas")+'</div>'+
+    '<div class="discovery-meta">'+(shopee?"Estoque: não confirmado pela API":(stock!==null?"Estoque disponível: "+safe(stock):"Estoque não informado"))+'</div>'+
     '<div class="discovery-meta">'+(commission!==null?"Comissão retornada: "+safe(commission):"Comissão não disponível nesta consulta")+'</div>'+
     '<div class="toolbar">'+(href?'<a class="btn" href="'+safe(href)+'" target="_blank" rel="noopener">Abrir produto</a>':'')+
     '<button class="btn primary" onclick="saveMarketplaceProduct('+JSON.stringify(platform)+','+i+')">Salvar no catálogo</button></div></article>';
@@ -278,7 +280,7 @@ async function searchMarketplaceProducts(platform){
 function saveMarketplaceProduct(platform,index){
  const p=(window.marketplaceSearchResults||{})[platform]?.[index];if(!p)return;
  const name=p.productName||p.title||p.name||"Produto";
- const item={name,category:p.category||"Não informada",platform:platform==="shopee"?"Shopee":"Mercado Livre",price:String(p.priceMin??p.price??""),rate:String(p.commissionRate??p.commission??""),link:p.offerLink||p.productLink||p.permalink||"",rating:p.ratingStar??p.rating??"",soldQuantity:p.sales??p.sold_quantity??"",stage:"Anúncio encontrado",verifiedAt:new Date().toISOString().slice(0,10),notes:"Importado da consulta da API da plataforma. Confira os dados e o link de afiliado antes de divulgar.",sourceId:String(p.itemId||p.id||p.productId||platform+"-"+Date.now())};
+ const item={name,category:p.category||"Não informada",platform:platform==="shopee"?"Shopee":"Mercado Livre",price:String(p.priceMin??p.price??""),rate:String(p.commissionRate??p.commission??""),link:p.offerLink||p.productLink||p.permalink||"",rating:p.ratingStar??p.rating??"",soldQuantity:p.sales??p.sold_quantity??"",freeShipping:p.shipping?.free_shipping?"yes":"",stage:"Anúncio encontrado",verifiedAt:new Date().toISOString().slice(0,10),notes:platform==="shopee"?"Vendas ordenadas pela API de afiliados. Estoque não confirmado pela API; conferir página do produto.":"Anúncio ativo e com estoque disponível confirmado pela API do Mercado Livre.",sourceId:String(p.itemId||p.id||p.productId||platform+"-"+Date.now())};
  const exists=db.products.some(x=>x.sourceId===item.sourceId&&x.platform===item.platform);
  if(exists){alert("Este produto já está no catálogo.");return;}
  db.products.unshift(item);save();alert("Produto salvo no catálogo. Confira os dados e complete o link de afiliado, se necessário.");
