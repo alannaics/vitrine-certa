@@ -353,15 +353,29 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
       "Link de afiliado: " + (link || "não informado"),
       "Informações adicionais verificadas: " + (details || "nenhuma")
     ].join("\n");
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 1200, thinkingConfig: { thinkingLevel: "low" } } })
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+    const requestBody = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 3200, thinkingConfig: { thinkingLevel: "low" } }
     });
-    const data = await response.json().catch(() => ({}));
+    let response, data = {};
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+        body: requestBody
+      });
+      data = await response.json().catch(() => ({}));
+      if (response.ok || ![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) break;
+      await new Promise(resolve => setTimeout(resolve, 900 * (attempt + 1)));
+    }
     if (!response.ok) {
+      const status = response.status;
+      if (status === 429 || status === 503 || status === 504) {
+        return res.status(503).json({ error: "O Gemini está com alta demanda no momento. A Vitrine Certa tentou novamente automaticamente, mas o serviço continua ocupado. Aguarde cerca de um minuto e tente gerar novamente; seus dados e o produto selecionado foram preservados." });
+      }
       const message = data.error?.message || "Falha ao gerar conteúdo no Gemini.";
-      return res.status(response.status === 429 ? 429 : 502).json({ error: message });
+      return res.status(502).json({ error: message });
     }
     const text = (data.candidates || []).flatMap(c => c.content?.parts || []).map(p => p.text || "").join("\n").trim();
     if (!text) return res.status(502).json({ error: "O Gemini não retornou texto. Tente novamente." });
