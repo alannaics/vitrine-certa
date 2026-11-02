@@ -254,10 +254,15 @@ async function searchMarketplaceProducts(platform){
   const r=await fetch(url,{cache:"no-store",headers}),d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(d.error||"A plataforma respondeu HTTP "+r.status+".");
   const items=shopee?(d.nodes||[]):(d.products||[]);
-  if(!items.length){status.textContent="Nenhum produto com vendas informadas e critérios disponíveis foi encontrado. Tente outro termo.";return;}
+  if(!items.length){
+   status.textContent=shopee
+    ?"A API de afiliados não retornou ofertas para este termo. Confira a configuração da Shopee ou tente outro produto."
+    :"A API retornou "+(d.catalogCount||0)+" itens de catálogo, mas não foi possível confirmar anúncios ativos com estoque e vendas. Não vou exibir esses itens como campeões de venda. Tente outro termo ou valide a autorização da conta.";
+   return;
+  }
   status.textContent=shopee
    ? items.length+" ofertas retornadas pela API de afiliados. Ordenadas pelas vendas quando esse dado existe; estoque precisa ser confirmado no anúncio."
-   : items.length+" resultados do catálogo. "+(d.verifiedCount||0)+" anúncios ativos com estoque confirmado; "+(d.catalogCount||0)+" produtos ainda precisam de validação no anúncio.";
+   : items.length+" anúncios ativos com estoque confirmado, ordenados pelas vendas reportadas. "+(d.catalogCount||0)+" itens de catálogo sem anúncio validado foram excluídos.";
   results.innerHTML=items.map((p,i)=>{
    const name=p.productName||p.title||p.name||"Produto sem título";
    const price=p.priceMin??p.price??p.price_max??null;
