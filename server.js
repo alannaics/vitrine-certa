@@ -269,7 +269,7 @@ app.get("/api/mercadolivre/products", async (req, res) => {
       .map(x => ({ ...x.value.catalog, sold_quantity: null, available_quantity: null, listing_status: "catalog",
         availabilityVerified: false, availabilityNote: "Produto de catálogo sem anúncio vencedor confirmado. Não é possível afirmar ranking de vendas ou estoque." }));
     const products = verified.sort((a,b) => (Number(b.sold_quantity)||0) - (Number(a.sold_quantity)||0));
-    res.json({ products, count: products.length, verifiedCount: verified.length, catalogCount: catalogOnly.length,
+    res.json({ products, catalogProducts: catalogOnly, count: products.length, verifiedCount: verified.length, catalogCount: catalogOnly.length,
       source: "API oficial de catálogo e anúncios do Mercado Livre",
       ranking: "Anúncios ativos com estoque confirmado, ordenados pelas vendas reportadas; catálogo sem anúncio confirmado aparece separado.",
       updatedAt: new Date().toISOString() });
