@@ -205,6 +205,51 @@ app.get("/api/shopee/products", requireDashboardToken, async (req, res) => {
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
+app.get("/api/mercadolivre/products", async (req, res) => {
+  try {
+    const query = String(req.query.q || "").trim().slice(0, 100);
+    if (!query) return res.status(400).json({ error: "Informe o nome do produto para pesquisar." });
+    const token = await ensureMlToken();
+    const url = new URL("https://api.mercadolibre.com/products/search");
+    url.search = new URLSearchParams({ site_id: "MLB", q: query, limit: "20" }).toString();
+    const response = await fetch(url, {
+      headers: { Accept: "application/json", Authorization: "Bearer " + token, "User-Agent": "VitrineCerta/1.0 (product catalog search)" }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.message || data.error || "A API de produtos do Mercado Livre respondeu HTTP " + response.status + ".");
+      error.status = response.status;
+      throw error;
+    }
+    const raw = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
+    const products = raw.map(item => {
+      const winner = item.buy_box_winner || item.buyBoxWinner || {};
+      const price = winner.price ?? item.price ?? item.price_info?.price;
+      const pictures = item.pictures || item.main_picture || [];
+      const picture = Array.isArray(pictures) ? pictures[0]?.url || pictures[0]?.secure_url : pictures?.url || pictures?.secure_url;
+      return {
+        id: item.id || winner.item_id || winner.id || null,
+        title: item.name || item.title || winner.title || "",
+        price: price == null ? null : Number(price),
+        permalink: winner.permalink || item.permalink || (item.id ? "https://www.mercadolivre.com.br/p/" + item.id : ""),
+        thumbnail: picture || winner.thumbnail || null,
+        rating: item.rating?.average ?? winner.rating_average ?? null,
+        sold_quantity: winner.sold_quantity ?? item.sold_quantity ?? null,
+        category: item.domain_id || item.category_id || "Mercado Livre",
+        platform: "Mercado Livre"
+      };
+    }).filter(item => item.title && item.permalink);
+    res.json({ products, count: products.length, source: "API oficial de catálogo do Mercado Livre", updatedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error("[mercadolivre-products]", error.message);
+    res.status(error.status === 401 || error.status === 403 ? error.status : 502).json({
+      error: error.status === 401
+        ? "A autorização do Mercado Livre expirou. Reconecte a conta em Configurações."
+        : error.message || "Não foi possível consultar o catálogo do Mercado Livre."
+    });
+  }
+});
+
 app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
   try {
     const start = Number(req.query.start);
