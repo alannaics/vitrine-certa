@@ -406,16 +406,31 @@ function renderDiscoveryProductCards(){
  }).join("");
 }
 function saveDiscoveryProduct(index,silent=false){
- const p=(window.discoveryProductResults||[])[index];if(!p)return;
+ const p=(window.discoveryProductResults||[])[index];if(!p)return null;
  const platform=p._market==="Shopee"?"Shopee":"Mercado Livre";
  const name=p.productName||p.title||p.name||"Produto";
  const sourceId=String(p.itemId||p.id||p.catalogId||p.productId||p.offerLink||p.permalink||platform+"-"+Date.now());
  const item={name,category:p.category||"Não informada",platform,seller:p.shopName||p.sellerName||p.sellerId||"",sellerId:p.sellerId||p.shopId||"",offerId:p.itemId||p.id||"",catalogId:p.catalogId||"",price:String(p.priceMin??p.price??""),rate:String(p.commissionRate??p.commission??""),link:p.offerLink||p.productLink||p.permalink||"",rating:String(p.ratingStar??p.rating??""),soldQuantity:String(p.sales??p.sold_quantity??""),freeShipping:p.shipping?.free_shipping?"yes":"",stage:p.resultType==="active"?"Anúncio ativo":p.resultType==="catalog"?"Catálogo · vendedor não confirmado":"Oferta encontrada",verifiedAt:new Date().toISOString().slice(0,10),notes:[p.shopName||p.sellerName||p.sellerId?"Vendedor: "+(p.shopName||p.sellerName||p.sellerId):"",p.offerLink?"Link de oferta retornado pela API.":p.permalink?"Link comum do produto; ainda não é link de afiliado.":"Link não informado.",p.resultType==="catalog"?"A API retornou item de catálogo, sem confirmar vendedor/estoque.":""].filter(Boolean).join(" "),sourceId};
- const exists=db.products.some(x=>x.sourceId===item.sourceId&&x.platform===item.platform);
- if(exists){alert("Esta oferta já está no catálogo.");return;}
- db.products.unshift(item);save();alert("Oferta salva no catálogo. Se o link salvo for comum, adicione seu link de afiliado ao editar o produto.");
+ const existing=db.products.find(x=>x.sourceId===item.sourceId&&x.platform===item.platform);
+ if(existing){if(!silent)alert("Esta oferta já está no catálogo.");return existing;}
+ db.products.unshift(item);save();
+ if(!silent)alert("Oferta salva no catálogo. Se o link salvo for comum, adicione seu link de afiliado ao editar o produto.");
+ return item;
 }
-function prepareDiscoveryCampaign(index){\n const saved=saveDiscoveryProduct(index,true);\n if(!saved){alert("Não foi possível salvar ou localizar esta oferta.");return;}\n renderAiProducts();\n const productIndex=db.products.indexOf(saved);\n if(productIndex<0){alert("Oferta salva, mas não foi possível selecioná-la automaticamente.");return;}\n el("aiProduct").value=String(productIndex);\n showPage("scripts");\n el("aiDetails").value="Preparar campanha para esta oferta. Confirmar preço, link de afiliado, comissão e disponibilidade antes de publicar.";\n el("aiOutput").value="";\n el("aiStatus").textContent="Oferta selecionada. Escolha o canal e gere o pacote de conteúdo com o Gemini.";\n el("aiProduct").scrollIntoView({behavior:"smooth",block:"center"});\n}\nfunction searchTrendOffers(query){el("discoveryProductQuery").value=query;el("discoveryMarketplace").value="both";searchDiscoveryProducts();el("discoveryProductQuery").scrollIntoView({behavior:"smooth",block:"center"});}
+function prepareDiscoveryCampaign(index){
+ const saved=saveDiscoveryProduct(index,true);
+ if(!saved){alert("Não foi possível salvar ou localizar esta oferta.");return;}
+ renderAiProducts();
+ const productIndex=db.products.indexOf(saved);
+ if(productIndex<0){alert("Oferta salva, mas não foi possível selecioná-la automaticamente.");return;}
+ el("aiProduct").value=String(productIndex);
+ showPage("scripts");
+ el("aiDetails").value="Preparar campanha para esta oferta. Confirmar preço, link de afiliado, comissão e disponibilidade antes de publicar.";
+ el("aiOutput").value="";
+ el("aiStatus").textContent="Oferta selecionada. Escolha o canal e gere o pacote de conteúdo com o Gemini.";
+ el("aiProduct").scrollIntoView({behavior:"smooth",block:"center"});
+}
+function searchTrendOffers(query){el("discoveryProductQuery").value=query;el("discoveryMarketplace").value="both";searchDiscoveryProducts();el("discoveryProductQuery").scrollIntoView({behavior:"smooth",block:"center"});}
 let discoveryItems=[];
 async function runDiscovery(){
  const status=el("discoveryStatus"),button=el("runDiscovery");
