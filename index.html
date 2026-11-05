@@ -581,9 +581,15 @@ async function importShopeeConversions(){
  if(end-start>31*86400){status.textContent="O intervalo máximo é de 31 dias.";return;}
  button.disabled=true;status.textContent="Consultando relatório oficial da Shopee...";
  try{
-  const r=await fetch("/api/shopee/conversions?start="+start+"&end="+end+"&limit=100",{headers:{"x-dashboard-token":token},cache:"no-store"});
-  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"HTTP "+r.status);
-  const nodes=Array.isArray(d.nodes)?d.nodes:[];let added=0;
+  let nodes=[],cursor="",pages=0,hasMore=true;
+  while(hasMore&&pages<5){
+   const url="/api/shopee/conversions?start="+start+"&end="+end+"&limit=100"+(cursor?"&scrollId="+encodeURIComponent(cursor):"");
+   const r=await fetch(url,{headers:{"x-dashboard-token":token},cache:"no-store"});
+   const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"HTTP "+r.status);
+   nodes.push(...(Array.isArray(d.nodes)?d.nodes:[]));cursor=d.pageInfo?.scrollId||"";hasMore=Boolean(d.pageInfo?.hasNextPage&&cursor);pages++;
+   if(hasMore)await new Promise(resolve=>setTimeout(resolve,150));
+  }
+  let added=0;
   for(const conversion of nodes){
    for(const order of (conversion.orders||[])){
     const key="shopee-"+String(conversion.conversionId||"") +"-"+String(order.orderId||"");
@@ -601,7 +607,7 @@ async function importShopeeConversions(){
    }
   }
   db.metricEntries=(db.metricEntries||[]).slice(0,5000);save();renderMetrics();
-  status.textContent=nodes.length+" conversões consultadas; "+added+" pedidos novos importados. Os registros existentes foram atualizados. "+(d.pageInfo?.hasNextPage?"Há mais páginas disponíveis; esta consulta importou a primeira página.":"Consulta concluída.");
+  status.textContent=nodes.length+" conversões consultadas; "+added+" pedidos novos importados. Os registros existentes foram atualizados. "+(hasMore?"Importadas "+pages+" páginas; ainda existem mais registros para buscar.":"Consulta concluída.");
  }catch(e){status.textContent="Não foi possível importar: "+e.message;}
  finally{button.disabled=false;}
 }
