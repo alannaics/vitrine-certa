@@ -634,10 +634,10 @@ async function importShopeeConversions(){
 let mlReportRows=[],mlReportHeaders=[];
 function parseCsvText(text){
  const first=(text.split(/\r?\n/,1)[0]||"");
- const candidates=["; ",",",";","\\t"];let delimiter=";";let best=-1;
- for(const d of candidates){const n=(first.split(d).length-1);if(n>best){best=n;delimiter=d.trim()==="\\t"?"\\t":d.trim();}}
+ const candidates=[";",",","\t"];let delimiter=";";let best=-1;
+ for(const d of candidates){const n=first.split(d).length-1;if(n>best){best=n;delimiter=d;}}
  const rows=[];let row=[],cell="",quoted=false;
- for(let i=0;i<text.length;i++){const ch=text[i],next=text[i+1];if(ch==='"'&&quoted&&next==='"'){cell+='"';i++;}else if(ch==='"'){quoted=!quoted;}else if(ch===delimiter&&!quoted){row.push(cell);cell="";}else if((ch==="\\n"||ch==="\\r")&&!quoted){if(ch==="\\r"&&next==="\\n")i++;row.push(cell);if(row.some(v=>v.trim()))rows.push(row);row=[];cell="";}else cell+=ch;}
+ for(let i=0;i<text.length;i++){const ch=text[i],next=text[i+1];if(ch==='"'&&quoted&&next==='"'){cell+='"';i++;}else if(ch==='"'){quoted=!quoted;}else if(ch===delimiter&&!quoted){row.push(cell);cell="";}else if((ch==="\n"||ch==="\r")&&!quoted){if(ch==="\r"&&next==="\n")i++;row.push(cell);if(row.some(v=>v.trim()))rows.push(row);row=[];cell="";}else cell+=ch;}
  row.push(cell);if(row.some(v=>v.trim()))rows.push(row);return rows;
 }
 function csvFieldSelect(id,label,optional=true){return '<label>'+label+'<select class="field" id="'+id+'">'+(optional?'<option value="">Não importar</option>':"")+mlReportHeaders.map((h,i)=>'<option value="'+i+'">'+safe(h||("Coluna "+(i+1)))+'</option>').join("")+'</select></label>';}
