@@ -620,7 +620,7 @@ async function importShopeeConversions(){
     const itemCommission=items.reduce((sum,x)=>sum+(Number(x.itemTotalCommission)||0),0);
     const commission=itemCommission||Number(conversion.totalCommission)||0;
     const sub=String(conversion.utmContent||"");
-    const campaign=(db.campaigns||[]).find(c=>sub&&(sub===c.id||sub.includes(c.id)||sub===c.channel||sub===c.product));
+    const campaign=(db.campaigns||[]).find(c=>sub&&Array.isArray(c.subIds)&&c.subIds.some(id=>id&&sub.includes(id)))||(db.campaigns||[]).find(c=>sub&&(sub===c.id||sub.includes(c.id)||sub===c.channel||sub===c.product));
     const entry={id:key,source:"shopee_api",conversionId:String(conversion.conversionId||""),orderId:String(order.orderId||""),platform:"Shopee",productName:names.join(", ")||"Pedido Shopee",campaignId:campaign?.id||"",campaignName:campaign?.product||"",status:state,clicks:0,sales:state==="cancelled"?0:1,commission,period:new Date((Number(conversion.purchaseTime)||start)*1000).toLocaleDateString("pt-BR"),utmContent:sub,createdAt:new Date((Number(conversion.purchaseTime)||start)*1000).toISOString(),rawOrderStatus:rawStatus};
     const existing=(db.metricEntries||[]).findIndex(x=>x.id===key);
     if(existing>=0)db.metricEntries[existing]=entry;else{db.metricEntries.unshift(entry);added++;}
