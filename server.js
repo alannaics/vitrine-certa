@@ -264,6 +264,13 @@ app.get("/api/mercadolivre/products", async (req, res) => {
           if (sellerResponse.ok) seller = await sellerResponse.json();
         } catch (_) {}
       }
+      let competition = null;
+      try {
+        const competitionUrl = new URL("https://api.mercadolibre.com/items/" + encodeURIComponent(itemId) + "/price_to_win");
+        competitionUrl.search = new URLSearchParams({ site_id: "MLB", version: "v2" }).toString();
+        const competitionResponse = await fetch(competitionUrl, { headers });
+        if (competitionResponse.ok) competition = await competitionResponse.json();
+      } catch (_) {}
       return { listing: { ...item, id: detail.id, title: detail.title || item.title,
         price: Number(detail.price ?? item.price) || null, permalink: detail.permalink || item.permalink,
         thumbnail: detail.thumbnail || item.thumbnail, sold_quantity: Number(detail.sold_quantity) || 0,
@@ -274,7 +281,16 @@ app.get("/api/mercadolivre/products", async (req, res) => {
         sellerPositiveRate: seller?.seller_reputation?.transactions?.ratings?.positive ?? null,
         officialStore: Boolean(detail.official_store_id), officialStoreId: detail.official_store_id || null,
         shipping: { free_shipping: Boolean(detail.shipping?.free_shipping), logistic_type: detail.shipping?.logistic_type || null },
-        availabilityVerified: true, category: detail.category_id || item.category } };
+        availabilityVerified: true, competition: competition ? {
+          status: competition.status || null,
+          currentPrice: competition.current_price ?? null,
+          priceToWin: competition.price_to_win ?? null,
+          competitorsSharingFirstPlace: competition.competitors_sharing_first_place ?? null,
+          visitShare: competition.visit_share || null,
+          reasons: Array.isArray(competition.reason) ? competition.reason : [],
+          boosts: Array.isArray(competition.boosts) ? competition.boosts.map(b => ({ id: b.id, status: b.status, description: b.description })) : [],
+          winner: competition.winner ? { itemId: competition.winner.item_id || null, price: competition.winner.price ?? null, sellerId: competition.winner.seller_id || null } : null
+        } : null, category: detail.category_id || item.category } };
     }));
     const verified = checked.filter(x => x.status === "fulfilled" && x.value?.listing).map(x => x.value.listing);
     const verifiedIds = new Set(verified.map(x => String(x.catalogId)));
