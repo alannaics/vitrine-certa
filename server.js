@@ -355,8 +355,10 @@ app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
       return res.status(400).json({ error: "Informe start e end como Unix timestamp (segundos), em intervalo máximo de 31 dias." });
     }
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 50));
+    const scrollId = String(req.query.scrollId || "").slice(0, 500);
+    const scrollArg = scrollId ? ", scrollId: " + JSON.stringify(scrollId) : "";
     const query = "{ conversionReport(purchaseTimeStart: " + start +
-      ", purchaseTimeEnd: " + end + ", limit: " + limit +
+      ", purchaseTimeEnd: " + end + scrollArg + ", limit: " + limit +
       ") { nodes { purchaseTime clickTime conversionId totalCommission sellerCommission " +
       "shopeeCommissionCapped buyerType device utmContent orders { orderId orderStatus " +
       "items { itemId itemName shopName itemPrice qty itemTotalCommission attributionType } } } " +
