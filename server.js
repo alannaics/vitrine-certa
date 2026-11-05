@@ -257,10 +257,23 @@ app.get("/api/mercadolivre/products", async (req, res) => {
       const detailResponse = await fetch("https://api.mercadolibre.com/items/" + encodeURIComponent(itemId), { headers });
       const detail = await detailResponse.json().catch(() => ({}));
       if (!detailResponse.ok || detail.status !== "active" || Number(detail.available_quantity || 0) <= 0) return null;
+      let seller = null;
+      if (detail.seller_id) {
+        try {
+          const sellerResponse = await fetch("https://api.mercadolibre.com/users/" + encodeURIComponent(detail.seller_id), { headers });
+          if (sellerResponse.ok) seller = await sellerResponse.json();
+        } catch (_) {}
+      }
       return { listing: { ...item, id: detail.id, title: detail.title || item.title,
         price: Number(detail.price ?? item.price) || null, permalink: detail.permalink || item.permalink,
         thumbnail: detail.thumbnail || item.thumbnail, sold_quantity: Number(detail.sold_quantity) || 0,
         available_quantity: Number(detail.available_quantity) || 0, listing_status: detail.status,
+        sellerId: detail.seller_id || null, sellerName: seller?.nickname || null,
+        sellerReputation: seller?.seller_reputation?.level_id || null,
+        sellerTransactions: seller?.seller_reputation?.transactions?.completed ?? null,
+        sellerPositiveRate: seller?.seller_reputation?.transactions?.ratings?.positive ?? null,
+        officialStore: Boolean(detail.official_store_id), officialStoreId: detail.official_store_id || null,
+        shipping: { free_shipping: Boolean(detail.shipping?.free_shipping), logistic_type: detail.shipping?.logistic_type || null },
         availabilityVerified: true, category: detail.category_id || item.category } };
     }));
     const verified = checked.filter(x => x.status === "fulfilled" && x.value?.listing).map(x => x.value.listing);
