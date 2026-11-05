@@ -491,8 +491,28 @@ function renderCampaignHistory(){
  const items=Array.isArray(db.campaigns)?db.campaigns:[];
  target.innerHTML=items.length?items.map((c,i)=>{
   const linked=(db.metricEntries||[]).filter(x=>x.campaignId===c.id),approved=linked.filter(x=>x.status==="approved"),pending=linked.filter(x=>x.status==="pending");
-  return '<article class="script"><span class="pill">'+safe(c.format||"Campanha")+(c.productPlatform?" · "+safe(c.productPlatform):"")+'</span><h3>'+safe(c.product||"Produto")+'</h3><div class="muted">Canal: '+safe(c.channel||"Não definido")+' · Objetivo: '+safe(c.objective||"Não definido")+'</div><div class="muted">Link: '+safe(c.linkStatus==="affiliate"?"Afiliado confirmado":c.productLink?"Link comum — ainda não confirmado como afiliado":"Sem link afiliado")+'</div><div class="muted">Resultados vinculados: '+linked.reduce((n,x)=>n+(+x.clicks||0),0)+' cliques · '+approved.reduce((n,x)=>n+(+x.sales||0),0)+' vendas aprovadas · '+fmt(approved.reduce((n,x)=>n+(+x.commission||0),0))+' aprovados · '+fmt(pending.reduce((n,x)=>n+(+x.commission||0),0))+' pendentes</div><p>'+safe((c.text||"").slice(0,280))+(String(c.text||"").length>280?"…":"")+'</p><div class="muted">'+(c.createdAt?new Date(c.createdAt).toLocaleString("pt-BR"):"Data não informada")+'</div><button class="btn" onclick="openCampaign('+i+')">Abrir no editor</button> <button class="btn" onclick="deleteCampaign('+i+')">Excluir</button></article>';
+  const tracked=c.subIds&&c.subIds[0]?c.subIds[0]:"";
+  return '<article class="script"><span class="pill">'+safe(c.format||"Campanha")+(c.productPlatform?" · "+safe(c.productPlatform):"")+'</span><h3>'+safe(c.product||"Produto")+'</h3><div class="muted">Canal: '+safe(c.channel||"Não definido")+' · Objetivo: '+safe(c.objective||"Não definido")+'</div><div class="muted">Link: '+safe(c.linkStatus==="affiliate"?"Afiliado confirmado":c.productLink?"Link comum — ainda não confirmado como afiliado":"Sem link afiliado")+'</div>'+(tracked?'<div class="muted">Sub ID: '+safe(tracked)+'</div>':'')+'<div class="muted">Resultados vinculados: '+linked.reduce((n,x)=>n+(+x.clicks||0),0)+' cliques · '+approved.reduce((n,x)=>n+(+x.sales||0),0)+' vendas aprovadas · '+fmt(approved.reduce((n,x)=>n+(+x.commission||0),0))+' aprovados · '+fmt(pending.reduce((n,x)=>n+(+x.commission||0),0))+' pendentes</div><p>'+safe((c.text||"").slice(0,280))+(String(c.text||"").length>280?"…":"")+'</p><div class="muted">'+(c.createdAt?new Date(c.createdAt).toLocaleString("pt-BR"):"Data não informada")+'</div>'+(c.productPlatform==="Shopee"?'<button class="btn primary" onclick="generateCampaignShopeeLink('+i+')">'+(c.generatedLink?"Atualizar link rastreável":"Gerar link rastreável Shopee")+'</button> ':'')+'<button class="btn" onclick="openCampaign('+i+')">Abrir no editor</button> <button class="btn" onclick="deleteCampaign('+i+')">Excluir</button><p class="muted" id="campaignLinkStatus'+i+'">'+(c.generatedLink?'Link rastreável gerado: '+safe(c.generatedLink):'')+'</p></article>';
  }).join(""):'<p class="muted">Nenhuma campanha salva ainda. Gere um pacote com o Gemini para começar seu histórico.</p>';
+}
+async function generateCampaignShopeeLink(i){
+ const c=db.campaigns[i];if(!c)return;
+ const status=el("campaignLinkStatus"+i),token=el("dashboardToken")?.value.trim()||sessionStorage.getItem("vcDashboardToken")||"";
+ if(!token){status.textContent="Informe o token privado do painel em Configurações.";return;}
+ const source=c.productLink||"";
+ if(!source){status.textContent="Esta campanha não tem link de produto salvo. Atualize o link no catálogo e gere novamente o conteúdo.";return;}
+ let url;try{url=new URL(source);}catch{status.textContent="O link salvo não é uma URL válida.";return;}
+ const host=url.hostname.toLowerCase();if(!(host==="shopee.com.br"||host.endsWith(".shopee.com.br")||host==="shopee.com"||host.endsWith(".shopee.com")||host==="shope.ee")){status.textContent="O link desta campanha não é um endereço Shopee reconhecido.";return;}
+ const slug=v=>String(v||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,18)||"na";
+ const subIds=[("vc-"+String(c.id||"").replace(/[^a-zA-Z0-9]/g,"").slice(-18)).slice(0,50),slug(c.channel),slug(c.product)];
+ status.textContent="Gerando link rastreável pela API Shopee...";
+ try{
+  const r=await fetch("/api/shopee/short-link",{method:"POST",headers:{"Content-Type":"application/json","x-dashboard-token":token},body:JSON.stringify({originUrl:source,subIds})});
+  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"HTTP "+r.status);
+  if(!d.shortLink)throw new Error("A API não retornou um link curto.");
+  c.generatedLink=d.shortLink;c.productLink=d.shortLink;c.linkStatus="affiliate";c.subIds=subIds;c.linkGeneratedAt=new Date().toISOString();save();renderCampaignHistory();
+  const product=db.products[Number(c.productId)];if(product){product.link=d.shortLink;product.linkStatus="generated";save();}
+ }catch(e){status.textContent="Não foi possível gerar: "+e.message;}
 }
 function deleteCampaign(i){if(!confirm("Excluir esta campanha do histórico?"))return;db.campaigns.splice(i,1);save();renderCampaignHistory();}
 function openCampaign(i){
