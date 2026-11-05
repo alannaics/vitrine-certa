@@ -174,13 +174,15 @@ app.get("/api/status", (_req, res) => {
 app.post("/api/shopee/short-link", requireDashboardToken, async (req, res) => {
   try {
     const originUrl = String(req.body?.originUrl || "");
-    const subIds = Array.isArray(req.body?.subIds) ? req.body.subIds.slice(0, 5).map(x => String(x).slice(0, 50)) : [];
+    const subIds = Array.isArray(req.body?.subIds) ? req.body.subIds.slice(0, 5).map(x => String(x).trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 50)).filter(Boolean) : [];
     let parsed;
     try { parsed = new URL(originUrl); } catch { return res.status(400).json({ error: "Informe uma URL válida." }); }
-    if (parsed.protocol !== "https:" || !/(^|\.)shopee\.com(\.br)?$/i.test(parsed.hostname) &&
-      !/(^|\.)shopee\.com\.br$/i.test(parsed.hostname) && !/(^|\.)shope\.ee$/i.test(parsed.hostname)) {
+    const host = parsed.hostname.toLowerCase();
+    const allowedHost = host === "shopee.com.br" || host.endsWith(".shopee.com.br") || host === "shopee.com" || host.endsWith(".shopee.com") || host === "shope.ee";
+    if (parsed.protocol !== "https:" || !allowedHost) {
       return res.status(400).json({ error: "Use um link HTTPS de produto/loja Shopee." });
     }
+    if (!subIds.length) return res.status(400).json({ error: "Informe ao menos um identificador de campanha." });
     const escapedUrl = JSON.stringify(originUrl);
     const escapedSubs = JSON.stringify(subIds);
     const query = "mutation { generateShortLink(input: { originUrl: " + escapedUrl +
