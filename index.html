@@ -573,7 +573,8 @@ function saveMetrics(){
 }
 function removeMetric(i){if(!confirm("Excluir este lançamento?"))return;db.metricEntries.splice(i,1);save();}
 function renderMetrics(){
- const campaign=el("metricCampaign");if(campaign){const selectedCampaign=campaign.value;campaign.innerHTML='<option value="">Não vinculada</option>'+(db.campaigns||[]).map(c=>'<option value="'+safe(c.id)+'">'+safe(c.product||"Produto")+' · '+safe(c.channel||"Canal")+"</option>").join("");campaign.value=selectedCampaign;}\n const product=el("metricProduct");if(product){const selected=product.value;product.innerHTML='<option value="">Não vinculado</option>'+db.products.map((p,i)=>'<option value="'+i+'">'+safe(p.name)+' · '+safe(p.platform)+'</option>').join("");product.value=selected;}
+ const campaign=el("metricCampaign");if(campaign){const selectedCampaign=campaign.value;campaign.innerHTML='<option value="">Não vinculada</option>'+(db.campaigns||[]).map(c=>'<option value="'+safe(c.id)+'">'+safe(c.product||"Produto")+' · '+safe(c.channel||"Canal")+"</option>").join("");campaign.value=selectedCampaign;}
+ const product=el("metricProduct");if(product){const selected=product.value;product.innerHTML='<option value="">Não vinculado</option>'+db.products.map((p,i)=>'<option value="'+i+'">'+safe(p.name)+' · '+safe(p.platform)+'</option>').join("");product.value=selected;}
  const entries=db.metricEntries||[],approved=entries.filter(x=>x.status==="approved");
  const clicks=entries.reduce((n,x)=>n+(+x.clicks||0),0),sales=approved.reduce((n,x)=>n+(+x.sales||0),0),commission=approved.reduce((n,x)=>n+(+x.commission||0),0);
  el("rClicks").textContent=clicks.toLocaleString("pt-BR");el("rSales").textContent=sales.toLocaleString("pt-BR");el("rCommission").textContent=fmt(commission);el("rRate").textContent=clicks?(sales/clicks*100).toFixed(2).replace(".",",")+"%":"0%";
