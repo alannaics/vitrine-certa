@@ -349,7 +349,7 @@ async function searchDiscoveryProducts(){
  try{
   const groups=await Promise.all(jobs);const all=groups.flatMap(g=>g.items.map(p=>({...p,_market:g.market})));
   window.discoveryProductResults=all;
-  results.innerHTML='<div class="toolbar" style="margin:10px 0"><label for="discoverySort">Ordenar resultados:</label><select id="discoverySort" onchange="renderDiscoveryProductCards()"><option value="relevance">Relevância</option><option value="price">Menor preço</option><option value="sales">Mais vendidos (quando informado)</option><option value="rating">Melhor avaliação</option><option value="commission">Maior comissão informada</option><option value="score">Melhores sinais comerciais</option></select></div><div id="discoveryProductCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px"></div>';
+  results.innerHTML='<div class="toolbar" style="margin:10px 0"><label for="discoverySort">Ordenar resultados:</label><select id="discoverySort" onchange="renderDiscoveryProductCards()"><option value="score">Sinais comerciais (pontuação)</option><option value="relevance">Relevância</option><option value="price">Menor preço</option><option value="sales">Mais vendidos (quando informado)</option><option value="rating">Melhor avaliação</option><option value="commission">Maior comissão informada</option><option value="score">Melhores sinais comerciais</option></select></div><div id="discoveryProductCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px"></div>';
   renderDiscoveryProductCards();
   const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);
   status.textContent=all.length+" resultado(s) listado(s) para \""+query+"\". "+groups.filter(g=>g.items.length).map(g=>g.market+": "+g.items.length).join(" · ")+(errors.length?" | Indisponível: "+errors.join(" | "):"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
@@ -357,23 +357,25 @@ async function searchDiscoveryProducts(){
  finally{button.disabled=false;}
 }
 function commercialOfferScore(p){
- const parts=[];
- const sold=Number(p.sales??p.sold_quantity);
- if(Number.isFinite(sold)&&sold>0)parts.push({label:"Vendas informadas",points:sold>=500?25:sold>=100?20:sold>=20?14:7});
- const rating=Number(p.ratingStar??p.rating);
- if(Number.isFinite(rating)&&rating>0)parts.push({label:"Avaliação",points:rating>=4.8?20:rating>=4.5?16:rating>=4?12:6});
- const commission=Number(p.commissionRate??p.commission);
- if(Number.isFinite(commission)&&commission>0)parts.push({label:"Comissão informada",points:Math.min(20,Math.round(commission))});
- const price=Number(p.priceMin??p.price);
- if(Number.isFinite(price)&&price>0)parts.push({label:"Preço disponível",points:10});
- if(p.resultType==="active"||p.availabilityVerified===true)parts.push({label:"Anúncio/estoque confirmado",points:20});
- if(p.shopName||p.sellerName||p.sellerId||p.shopId)parts.push({label:"Vendedor identificado",points:5});
- return {score:parts.reduce((n,x)=>n+x.points,0),known:parts.length,parts,missing:["vendas","avaliação","comissão","preço","disponibilidade","vendedor"].filter(k=>!parts.some(x=>({vendas:"Vendas informadas",avaliação:"Avaliação",comissão:"Comissão informada",preço:"Preço disponível",disponibilidade:"Anúncio/estoque confirmado",vendedor:"Vendedor identificado"})[k]===x.label))};
+ const parts=[],missing=[];
+ const soldRaw=p.sales??p.sold_quantity,sold=soldRaw==null||soldRaw===""?null:Number(soldRaw);
+ if(sold!==null&&Number.isFinite(sold)&&sold>=0)parts.push({label:"Vendas informadas",points:sold>=500?25:sold>=100?20:sold>=20?14:sold>0?7:0});else missing.push("vendas");
+ const ratingRaw=p.ratingStar??p.rating,rating=ratingRaw==null||ratingRaw===""?null:Number(ratingRaw);
+ if(rating!==null&&Number.isFinite(rating)&&rating>0)parts.push({label:"Avaliação",points:rating>=4.8?20:rating>=4.5?16:rating>=4?12:6});else missing.push("avaliação");
+ const reputation=String(p.sellerReputation||"").toLowerCase();
+ if(reputation){const pts=({"5_green":15,"4_light_green":13,"3_yellow":9,"2_orange":5,"1_red":1})[reputation]??5;parts.push({label:"Reputação do vendedor",points:pts});}
+ else if(p.sellerTransactions!==null&&p.sellerTransactions!==undefined)parts.push({label:"Histórico do vendedor",points:Math.min(15,Number(p.sellerTransactions)>1000?15:Number(p.sellerTransactions)>100?10:5)});else missing.push("reputação do vendedor");
+ if(p.availabilityVerified===true||p.resultType==="active"){parts.push({label:"Anúncio ativo e estoque confirmado",points:10});if(p.shipping?.free_shipping)parts.push({label:"Frete grátis",points:5});}else missing.push("disponibilidade");
+ const cr=p.commissionRate??p.commission,commission=cr==null||cr===""?null:Number(cr);
+ if(commission!==null&&Number.isFinite(commission)&&commission>0)parts.push({label:"Comissão informada",points:Math.min(15,Math.max(1,Math.round(commission)))});else missing.push("comissão de afiliado");
+ const pr=p.priceMin??p.price,price=pr==null||pr===""?null:Number(pr);
+ if(price!==null&&Number.isFinite(price)&&price>0)parts.push({label:"Preço informado",points:10});else missing.push("preço");
+ return {score:Math.min(100,parts.reduce((n,x)=>n+x.points,0)),known:parts.length,parts,missing,confidence:missing.length<=1?"Alta disponibilidade de dados":missing.length<=3?"Dados parciais":"Poucos dados confirmados",warning:missing.includes("comissão de afiliado")?"Comissão não confirmada: rentabilidade não comprovada.":""};
 }
 function renderDiscoveryProductCards(){
  const target=el("discoveryProductCards");if(!target)return;
  const all=(window.discoveryProductResults||[]).slice();
- const sort=el("discoverySort")?.value||"relevance";
+ const sort=el("discoverySort")?.value||"score";
  const num=v=>{if(v===null||v===undefined||v==="")return null;const n=Number(v);return Number.isFinite(n)?n:null;};
  const tokens=(el("discoveryProductQuery")?.value||"").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").split(/[^a-z0-9]+/).filter(x=>x.length>2);
  const score=p=>{const title=(p.productName||p.title||p.name||"").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"");return tokens.length?tokens.filter(t=>title.includes(t)).length/tokens.length:0;};
