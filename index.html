@@ -402,10 +402,10 @@ function renderDiscoveryProductCards(){
    '<div class="discovery-meta">'+(p.sellerName?"Vendedor: "+safe(p.sellerName):"Vendedor não informado")+(p.sellerReputation?" · Reputação: "+safe(p.sellerReputation):" · Reputação não informada")+(p.sellerTransactions!==null&&p.sellerTransactions!==undefined?" · Vendas concluídas do vendedor: "+safe(p.sellerTransactions):"")+(p.officialStore?" · Loja oficial":"")+(p.shipping?.free_shipping?" · Frete grátis":"")+'</div>'+
    '<div class="notice"><b>Sinais comerciais: '+commercial.score+'/100</b> · '+commercial.known+'/6 dados disponíveis<br><small>'+safe(commercial.parts.map(x=>x.label+" +"+x.points).join(" · ")||"Sem sinais comerciais suficientes")+'</small><br><small>'+safe(commercial.confidence)+' · Dados ausentes: '+safe(commercial.missing.join(", ")||"nenhum")+'</small>'+(commercial.warning?'<br><b>'+safe(commercial.warning)+'</b>':'')+'</div>'+
    '<div class="toolbar">'+(link?'<a class="btn" href="'+safe(link)+'" target="_blank" rel="noopener">Abrir oferta</a>':'')+
-   '<button class="btn primary" onclick="saveDiscoveryProduct('+index+')">Salvar no catálogo</button></div></article>';
+   '<button class="btn primary" onclick="saveDiscoveryProduct('+index+')">Salvar no catálogo</button> <button class="btn" onclick="prepareDiscoveryCampaign('+index+')">Salvar e preparar conteúdo</button></div></article>';
  }).join("");
 }
-function saveDiscoveryProduct(index){
+function saveDiscoveryProduct(index,silent=false){
  const p=(window.discoveryProductResults||[])[index];if(!p)return;
  const platform=p._market==="Shopee"?"Shopee":"Mercado Livre";
  const name=p.productName||p.title||p.name||"Produto";
@@ -415,7 +415,7 @@ function saveDiscoveryProduct(index){
  if(exists){alert("Esta oferta já está no catálogo.");return;}
  db.products.unshift(item);save();alert("Oferta salva no catálogo. Se o link salvo for comum, adicione seu link de afiliado ao editar o produto.");
 }
-function searchTrendOffers(query){el("discoveryProductQuery").value=query;el("discoveryMarketplace").value="both";searchDiscoveryProducts();el("discoveryProductQuery").scrollIntoView({behavior:"smooth",block:"center"});}
+function prepareDiscoveryCampaign(index){\n const saved=saveDiscoveryProduct(index,true);\n if(!saved){alert("Não foi possível salvar ou localizar esta oferta.");return;}\n renderAiProducts();\n const productIndex=db.products.indexOf(saved);\n if(productIndex<0){alert("Oferta salva, mas não foi possível selecioná-la automaticamente.");return;}\n el("aiProduct").value=String(productIndex);\n showPage("scripts");\n el("aiDetails").value="Preparar campanha para esta oferta. Confirmar preço, link de afiliado, comissão e disponibilidade antes de publicar.";\n el("aiOutput").value="";\n el("aiStatus").textContent="Oferta selecionada. Escolha o canal e gere o pacote de conteúdo com o Gemini.";\n el("aiProduct").scrollIntoView({behavior:"smooth",block:"center"});\n}\nfunction searchTrendOffers(query){el("discoveryProductQuery").value=query;el("discoveryMarketplace").value="both";searchDiscoveryProducts();el("discoveryProductQuery").scrollIntoView({behavior:"smooth",block:"center"});}
 let discoveryItems=[];
 async function runDiscovery(){
  const status=el("discoveryStatus"),button=el("runDiscovery");
