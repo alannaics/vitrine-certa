@@ -95,6 +95,18 @@ body:not(.vc-embedded) .btn{border-radius:11px!important}
 body:not(.vc-embedded) .field{border-radius:11px!important;border-color:#e1e5ef!important}
 @media(max-width:950px){body:not(.vc-embedded) .app{grid-template-columns:1fr!important}body:not(.vc-embedded) .side{height:auto!important;position:relative!important;padding:16px!important;gap:14px!important}body:not(.vc-embedded) .side .vc-caption,body:not(.vc-embedded) .side .vc-sidebar-foot{display:none!important}body:not(.vc-embedded) .side .vc-nav{display:flex;overflow-x:auto;scrollbar-width:none;gap:6px}body:not(.vc-embedded) .side .vc-nav a{white-space:nowrap;flex:0 0 auto;padding:10px 12px;font-size:12px}body:not(.vc-embedded) .main{padding:20px 16px 40px!important}}
 @media(max-width:550px){body:not(.vc-embedded) .main{padding:18px 12px 32px!important}body:not(.vc-embedded) .main>.top{align-items:flex-start!important}body:not(.vc-embedded) .main>.top h1{font-size:27px!important}body:not(.vc-embedded) #nav{margin-bottom:12px}body:not(.vc-embedded) .home-hero{padding:22px!important}}
+</style><style id="vc-market-ui">
+.vc-market-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:13px;margin-top:15px}
+.vc-market-card{display:flex;flex-direction:column;padding:0!important;overflow:hidden;border:1px solid #e8eaf1!important;border-radius:16px!important;background:white!important;min-width:0}
+.vc-market-image{height:205px;padding:12px;background:white;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #f0f1f5}
+.vc-market-image img{width:100%;height:100%;object-fit:contain}.vc-market-fallback{color:#8d97a9;font-size:12px}
+.vc-market-content{display:flex;flex-direction:column;gap:9px;padding:13px;flex:1;min-width:0}
+.vc-market-source{font-size:10px;color:#6c5cda;font-weight:800}
+.vc-market-content h3{font-size:13px!important;line-height:1.4!important;margin:0!important;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:53px}
+.vc-market-price{font:800 20px Manrope,system-ui;color:#20263b}
+.vc-market-extra{color:#748096;font-size:11px}.vc-market-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:auto;padding-top:8px}
+.vc-market-actions .btn{font-size:11px!important;padding:9px!important;text-align:center!important;flex:1;white-space:nowrap}
+@media(max-width:600px){.vc-market-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.vc-market-image{height:150px;padding:7px}.vc-market-content{padding:10px}.vc-market-price{font-size:17px}.vc-market-actions{flex-direction:column}}
 </style></head><body><script>if(new URLSearchParams(location.search).get('embedded')==='1'){document.body.classList.add('vc-embedded');addEventListener('load',()=>{const send=()=>parent.postMessage({type:'vc-tools-height',height:Math.ceil(document.documentElement.scrollHeight)+30},location.origin);send();new ResizeObserver(send).observe(document.querySelector('.main'))})}</script><div class="app"><aside class="side"><div class="brand"><i>V</i> Vitrine Certa</div><div class="brand-sub">Inteligência de afiliados</div><div class="nav-caption">Painel</div><nav id="nav"><button class="active" data-page="home">⌂ Visão geral</button><button data-page="products">◇ Produtos</button><button data-page="discovery">✦ Inteligência</button><button data-page="calendar">▦ Plano 30 dias</button><button data-page="scripts">✎ Conteúdos</button><button data-page="results">↗ Resultados</button><button data-page="roadmap">▤ Etapas do projeto</button><button data-page="settings">⚙ Configurações</button></nav><div class="studio-divider"></div><div class="studio-links"><a class="studio-link" href="/catalog"><b>▦</b> Catálogo Mercado Livre</a><a class="studio-link" href="/finance"><b>◈</b> Central financeira</a></div><div class="studio-status"><span class="studio-dot"></span> Vitrine Certa Studio</div><div class="side-foot"><div class="muted">Curadoria • Conteúdo • Resultados</div></div></aside><main class="main"><header class="top"><div><div class="eyebrow">Vitrine Certa / Workspace</div><h1 id="title">Visão geral</h1><div class="muted" id="subtitle">Organize produtos, publicações e resultados.</div></div><button class="btn primary" onclick="newProduct()">＋ Novo produto</button></header>
 <section class="page show" id="home">
 <div class="home-hero"><div><div class="eyebrow">Seu centro de decisões</div><h2>Encontre oportunidades. Planeje conteúdo. Acompanhe resultados.</h2><p class="muted">A Vitrine Certa reúne pesquisa de produtos, validação de ofertas e planejamento de divulgação em um só painel.</p></div><div class="hero-actions"><button class="btn primary" onclick="showPage('discovery')">Abrir inteligência</button><button class="btn" onclick="showPage('scripts')">Criar conteúdo</button></div></div>
@@ -369,9 +381,9 @@ async function searchDiscoveryProducts(){
  const jobs=[];
  if(market==="both"||market==="ml")jobs.push((async()=>{
   try{
-   const r=await fetch("/api/mercadolivre/products?q="+encodeURIComponent(query),{cache:"no-store"});
+   const r=await fetch("/api/catalog/mercadolivre?q="+encodeURIComponent(query),{cache:"no-store"});
    const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Mercado Livre HTTP "+r.status);
-   return {market:"Mercado Livre",items:[...(d.products||[]).map(p=>({...p,resultType:"active"})),...(d.catalogProducts||[]).map(p=>({...p,resultType:"catalog"}))],error:null};
+   return {market:"Mercado Livre",items:(d.products||[]).map(p=>({...p,resultType:"search",imageUrl:p.thumbnail,productName:p.title,offerLink:p.permalink,freeShipping:p.freeShipping})),error:null};
   }catch(e){return {market:"Mercado Livre",items:[],error:e.message};}
  })());
  if(market==="both"||market==="shopee")jobs.push((async()=>{
@@ -385,7 +397,7 @@ async function searchDiscoveryProducts(){
  try{
   const groups=await Promise.all(jobs);const all=groups.flatMap(g=>g.items.map(p=>({...p,_market:g.market})));
   window.discoveryProductResults=all;
-  results.innerHTML='<div class="toolbar" style="margin:10px 0"><label for="discoverySort">Ordenar resultados:</label><select id="discoverySort" onchange="renderDiscoveryProductCards()"><option value="score">Sinais comerciais (pontuação)</option><option value="relevance">Relevância</option><option value="price">Menor preço</option><option value="sales">Mais vendidos (quando informado)</option><option value="rating">Melhor avaliação</option><option value="commission">Maior comissão informada</option><option value="score">Melhores sinais comerciais</option></select></div><div id="discoveryProductCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px"></div>';
+  results.innerHTML='<div class="toolbar" style="margin:10px 0"><label for="discoverySort">Ordenar resultados:</label><select id="discoverySort" onchange="renderDiscoveryProductCards()"><option value="relevance">Relevância</option><option value="price">Menor preço</option><option value="sales">Mais vendidos (quando informado)</option><option value="rating">Melhor avaliação</option><option value="commission">Maior comissão informada</option><option value="score">Sinais disponíveis</option></select></div><div id="discoveryProductCards" class="vc-market-grid"></div>';
   renderDiscoveryProductCards();
   const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);
   status.textContent=all.length+" resultado(s) listado(s) para \""+query+"\". "+groups.filter(g=>g.items.length).map(g=>g.market+": "+g.items.length).join(" · ")+(errors.length?" | Indisponível: "+errors.join(" | "):"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
@@ -411,37 +423,36 @@ function commercialOfferScore(p){
 function renderDiscoveryProductCards(){
  const target=el("discoveryProductCards");if(!target)return;
  const all=(window.discoveryProductResults||[]).slice();
- const sort=el("discoverySort")?.value||"score";
- const num=v=>{if(v===null||v===undefined||v==="")return null;const n=Number(v);return Number.isFinite(n)?n:null;};
- const tokens=(el("discoveryProductQuery")?.value||"").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").split(/[^a-z0-9]+/).filter(x=>x.length>2);
- const score=p=>{const title=(p.productName||p.title||p.name||"").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"");return tokens.length?tokens.filter(t=>title.includes(t)).length/tokens.length:0;};
- all.sort((a,b)=>{
-  if(sort==="price")return (num(a.priceMin??a.price)??Infinity)-(num(b.priceMin??b.price)??Infinity);
-  if(sort==="sales")return (num(b.sales??b.sold_quantity)??-1)-(num(a.sales??a.sold_quantity)??-1);
-  if(sort==="rating")return (num(b.ratingStar??b.rating)??-1)-(num(a.ratingStar??a.rating)??-1);
-  if(sort==="commission")return (num(b.commissionRate??b.commission)??-1)-(num(a.commissionRate??a.commission)??-1);
-  if(sort==="score")return commercialOfferScore(b).score-commercialOfferScore(a).score;
-  return score(b)-score(a);
- });
+ const sort=el("discoverySort")?.value||"relevance";
+ const number=v=>v===null||v===undefined||v===""?null:Number.isFinite(Number(v))?Number(v):null;
+ if(sort==="price")all.sort((a,b)=>(number(a.priceMin??a.price)??Infinity)-(number(b.priceMin??b.price)??Infinity));
+ else if(sort==="sales")all.sort((a,b)=>(number(b.sales??b.sold_quantity??b.soldQuantity)??-1)-(number(a.sales??a.sold_quantity??a.soldQuantity)??-1));
+ else if(sort==="rating")all.sort((a,b)=>(number(b.ratingStar??b.rating)??-1)-(number(a.ratingStar??a.rating)??-1));
+ else if(sort==="commission")all.sort((a,b)=>(number(b.commissionRate??b.commission)??-1)-(number(a.commissionRate??a.commission)??-1));
+ else if(sort==="score")all.sort((a,b)=>commercialOfferScore(b).score-commercialOfferScore(a).score);
  window.discoveryProductResults=all;
- target.innerHTML=all.map((p,index)=>{
-  const marketName=p._market||"Marketplace",name=p.productName||p.title||p.name||"Produto sem título";
-  const price=p.priceMin??p.price??null,image=p.imageUrl||p.thumbnail||"",link=p.offerLink||p.productLink||p.permalink||"";
-  const sales=p.sales??p.sold_quantity,rating=p.ratingStar??p.rating,commission=p.commissionRate??p.commission;
-  const commercial=commercialOfferScore(p);
-  const state=p.resultType==="active"?"Anúncio ativo · estoque confirmado":p.resultType==="catalog"?"Resultado de catálogo · anúncio/estoque não confirmados":"Oferta retornada pela API de afiliados";
-  return '<article class="discovery-card">'+(image?'<img src="'+safe(image)+'" alt="" style="width:100%;height:145px;object-fit:contain;border-radius:10px;background:#fff7fa">':'')+
-   '<span class="pill">'+safe(marketName)+' · '+state+'</span><h3>'+safe(name)+'</h3>'+
-   '<div class="discovery-meta">'+(price!==null?"Preço informado: R$ "+Number(price).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"Preço não informado")+'</div>'+
-   '<div class="discovery-meta">'+(sales!==undefined&&sales!==null?"Vendas informadas: "+safe(sales):"Vendas não informadas")+' · '+(rating!==undefined&&rating!==null?"Avaliação: "+safe(rating):"Avaliação não informada")+'</div>'+
-   '<div class="discovery-meta">'+(commission!==undefined&&commission!==null?"Comissão informada: "+safe(commission):"Comissão não informada")+'</div>'+
-   '<div class="discovery-meta">'+(p.sellerName?"Vendedor: "+safe(p.sellerName):"Vendedor não informado")+(p.sellerReputation?" · Reputação: "+safe(p.sellerReputation):" · Reputação não informada")+(p.sellerTransactions!==null&&p.sellerTransactions!==undefined?" · Vendas concluídas do vendedor: "+safe(p.sellerTransactions):"")+(p.officialStore?" · Loja oficial":"")+(p.shipping?.free_shipping?" · Frete grátis":"")+'</div>'+
-   (p.competition?'<div class="notice"><b>Concorrência no catálogo</b><br><small>Status: '+safe(p.competition.status||"não informado")+' · Visibilidade: '+safe(p.competition.visitShare||"não informada")+'</small><br><small>Preço atual: '+(p.competition.currentPrice!==null?"R$ "+Number(p.competition.currentPrice).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"não informado")+' · Preço para competir: '+(p.competition.priceToWin!==null?"R$ "+Number(p.competition.priceToWin).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}):"não informado")+'</small><br><small>Vendedores compartilhando o 1º lugar: '+(p.competition.competitorsSharingFirstPlace??"não informado")+'</small>'+(p.competition.reasons?.length?'<br><small>Motivos: '+safe(p.competition.reasons.join(", "))+'</small>':'')+'</div>':'<div class="notice"><b>Concorrência no catálogo:</b> não retornada para este anúncio.</div>')+
-   '<div class="notice"><b>Sinais comerciais: '+commercial.score+'/100</b> · '+commercial.known+'/6 dados disponíveis<br><small>'+safe(commercial.parts.map(x=>x.label+" +"+x.points).join(" · ")||"Sem sinais comerciais suficientes")+'</small><br><small>'+safe(commercial.confidence)+' · Dados ausentes: '+safe(commercial.missing.join(", ")||"nenhum")+'</small>'+(commercial.warning?'<br><b>'+safe(commercial.warning)+'</b>':'')+'</div>'+
-   '<div class="toolbar">'+(link?'<a class="btn" href="'+safe(link)+'" target="_blank" rel="noopener">Abrir oferta</a>':'')+
-   '<button class="btn primary" onclick="saveDiscoveryProduct('+index+')">Salvar no catálogo</button> <button class="btn" onclick="prepareDiscoveryCampaign('+index+')">Salvar e preparar conteúdo</button></div></article>';
- }).join("");
+ target.replaceChildren();
+ for(let index=0;index<all.length;index++){
+  const p=all[index],name=p.productName||p.title||p.name||"Produto sem título";
+  const price=number(p.priceMin??p.price),imgSrc=String(p.imageUrl||p.thumbnail||"").replace("http://","https://");
+  const link=String(p.offerLink||p.productLink||p.permalink||"");
+  const card=document.createElement("article");card.className="discovery-card vc-market-card";
+  const imageBox=document.createElement("div");imageBox.className="vc-market-image";
+  const fallback=document.createElement("span");fallback.textContent="Foto indisponível";fallback.className="vc-market-fallback";
+  if(imgSrc.startsWith("https://")){const image=document.createElement("img");image.src=imgSrc;image.alt="Foto de "+name;image.loading="lazy";image.decoding="async";image.referrerPolicy="no-referrer";image.onerror=()=>{image.remove();imageBox.append(fallback)};imageBox.append(image)}else imageBox.append(fallback);
+  const content=document.createElement("div");content.className="vc-market-content";
+  const source=document.createElement("span");source.className="vc-market-source";source.textContent=p._market||"Marketplace";
+  const heading=document.createElement("h3");heading.textContent=name;heading.title=name;
+  const priceEl=document.createElement("strong");priceEl.className="vc-market-price";priceEl.textContent=price===null?"Preço não informado":price.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+  const extra=document.createElement("small");extra.className="vc-market-extra";extra.textContent=p.freeShipping||p.shipping?.free_shipping?"Frete grátis":p.resultType==="catalog"?"Item de catálogo":"Consulte as condições";
+  const actions=document.createElement("div");actions.className="vc-market-actions";
+  const saveBtn=document.createElement("button");saveBtn.type="button";saveBtn.className="btn primary";saveBtn.textContent="Salvar produto";saveBtn.onclick=()=>saveDiscoveryProduct(index);
+  actions.append(saveBtn);
+  if(link.startsWith("https://")){const open=document.createElement("a");open.className="btn";open.href=link;open.target="_blank";open.rel="noopener noreferrer";open.textContent="Ver anúncio";actions.append(open)}
+  content.append(source,heading,priceEl,extra,actions);card.append(imageBox,content);target.append(card);
+ }
 }
+
 function saveDiscoveryProduct(index,silent=false){
  const p=(window.discoveryProductResults||[])[index];if(!p)return null;
  const platform=p._market==="Shopee"?"Shopee":"Mercado Livre";
