@@ -12,12 +12,16 @@ function registerCatalog(app,ensureToken){
   const old=cache.get(key);
   if(old&&Date.now()-old.time<15*60*1000)return res.json({...old.payload,cached:true});
   try{
-   const token=await ensureToken();
+   let token=null,authIssue=null;
+   try{token=await ensureToken()}catch(e){authIssue=e.message}
    const url=new URL("https://api.mercadolibre.com/sites/MLB/search");
    url.search=new URLSearchParams({q,limit:String(limit),offset:String((page-1)*limit)}).toString();
-   const response=await fetch(url,{headers:{Authorization:"Bearer "+token,Accept:"application/json","User-Agent":"VitrineCerta/1.0"}});
+   const headers={Accept:"application/json","User-Agent":"VitrineCerta/1.0"};
+   if(token)headers.Authorization="Bearer "+token;
+   let response=await fetch(url,{headers});
+   if((response.status===401||response.status===403)&&token){delete headers.Authorization;response=await fetch(url,{headers})}
    const data=await response.json().catch(()=>({}));
-   if(!response.ok)return res.status(response.status===401||response.status===403?response.status:502).json({error:"Mercado Livre não liberou esta consulta.",upstreamStatus:response.status});
+   if(!response.ok)return res.status(response.status===401||response.status===403?response.status:502).json({error:authIssue?"A conexão Mercado Livre precisa ser corrigida: "+authIssue+"; a busca pública também foi recusada (HTTP "+response.status+").":"A API do Mercado Livre recusou a busca (HTTP "+response.status+").",upstreamStatus:response.status});
    const products=(Array.isArray(data.results)?data.results:[]).map(p=>({
     id:String(p.id||""),title:String(p.title||""),price:Number.isFinite(Number(p.price))?Number(p.price):null,
     thumbnail:String(p.thumbnail||""),permalink:String(p.permalink||""),
@@ -30,7 +34,7 @@ function registerCatalog(app,ensureToken){
    if(cache.size>120)cache.clear();
    cache.set(key,{time:Date.now(),payload});
    res.json(payload);
-  }catch(e){console.error("[catalog]",e.message);res.status(e.status===401?401:502).json({error:"Não foi possível carregar o catálogo. Verifique a conexão com o Mercado Livre."})}
+  }catch(e){console.error("[catalog]",e.message);res.status(e.status===401?401:502).json({error:"Não foi possível carregar o catálogo: "+e.message})}
  });
 }
 module.exports={registerCatalog};
