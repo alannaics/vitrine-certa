@@ -2,10 +2,14 @@ const express = require("express");
 const crypto = require("node:crypto");
 const path = require("node:path");
 const { Pool } = require("pg");
+const { registerFinance, initializeFinance } = require("./finance");
+const { registerCatalog } = require("./catalog");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.get("/finance", (_req, res) => res.sendFile(path.join(__dirname, "finance.html")));
+app.get("/catalog", (_req, res) => res.sendFile(path.join(__dirname, "catalog.html")));
 
 const PORT = process.env.PORT || 3000;
 const APP_ID = process.env.SHOPEE_APP_ID;
@@ -70,6 +74,7 @@ const db = DATABASE_URL ? new Pool({
   connectionTimeoutMillis: 10000
 }) : null;
 
+registerFinance(app, db, requireDashboardToken);
 function tokenEncryptionKey() {
   if (!ML_CLIENT_SECRET) return null;
   return crypto.scryptSync(ML_CLIENT_SECRET, "vitrine-certa-ml-oauth-v1", 32);
@@ -109,6 +114,7 @@ async function loadMlTokens() {
 }
 async function initializeDatabase() {
   if (!db) return;
+  await initializeFinance(db);
   await db.query("CREATE TABLE IF NOT EXISTS app_secrets (secret_name TEXT PRIMARY KEY, secret_value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS dashboard_state (id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1), state JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS saved_campaigns (id TEXT PRIMARY KEY, product_name TEXT NOT NULL, format TEXT, content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
@@ -163,6 +169,7 @@ async function ensureMlToken() {
   return mlAccessToken;
 }
 
+registerCatalog(app, ensureMlToken);
 app.get("/api/status", (_req, res) => {
   res.json({
     database: { configured: Boolean(db) },
@@ -348,6 +355,32 @@ app.post("/api/affiliate/inspect", requireDashboardToken, async (req, res) => {
   }
 });
 
+app.get("/api/finance/shopee-summary", requireDashboardToken, async (req,res)=>{
+ try{
+  const days=Math.max(1,Math.min(30,Number.parseInt(req.query.days,10)||30));
+  const end=Math.floor(Date.now()/1000),start=end-days*86400;
+  const seen=new Set(),records=[];
+  let scrollId="",hasNext=true,pages=0;
+  while(hasNext&&pages<10){
+   const scrollArg=scrollId?", scrollId: "+JSON.stringify(scrollId):"";
+   const query="{ conversionReport(purchaseTimeStart: "+start+", purchaseTimeEnd: "+end+scrollArg+", limit: 100) { nodes { conversionId totalCommission orders { orderId orderStatus } } pageInfo { hasNextPage scrollId } } }";
+   const data=await shopeeRequest(query);
+   const report=data?.conversionReport||{};
+   for(const n of report.nodes||[]){
+    const id=String(n.conversionId||"");
+    if(!id||seen.has(id))continue;
+    seen.add(id);
+    records.push({id,commission:Number(n.totalCommission)||0,statuses:(n.orders||[]).map(o=>o.orderStatus)});
+   }
+   hasNext=Boolean(report.pageInfo?.hasNextPage);
+   const next=String(report.pageInfo?.scrollId||"");
+   if(!next||next===scrollId)hasNext=false;
+   scrollId=next;pages++;
+  }
+  const total=records.reduce((n,r)=>n+r.commission,0);
+  res.json({platform:"Shopee",periodDays:days,conversions:records.length,reportedCommission:Math.round(total*100)/100,currency:"BRL",partial:hasNext,source:"Shopee Affiliate conversionReport",note:"Comissão informada pela API, incluindo possíveis pedidos pendentes ou cancelados. Não representa necessariamente comissão aprovada, recebida ou lucro líquido.",updatedAt:new Date().toISOString()});
+ }catch(e){res.status(e.status||502).json({error:e.message||"Falha ao consultar comissões Shopee."})}
+});
 app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
   try {
     const start = Number(req.query.start);
@@ -521,7 +554,7 @@ app.get("/oauth/mercadolivre/callback", async (req, res) => {
     mlRefreshToken = data.refresh_token;
     mlTokenExpiresAt = Date.now() + Number(data.expires_in || 21600) * 1000;
     await saveMlTokens();
-    res.type("html").send("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Mercado Livre conectado</title><body style='font:16px system-ui;max-width:560px;margin:12vh auto;padding:24px;color:#28232a'><h2>Autorização recebida</h2><p>O Mercado Livre foi conectado ao Vitrine Certa nesta sessão do servidor.</p><p>Volte ao painel para verificar o status. No plano gratuito, uma reinicialização pode exigir nova autorização.</p><a href='/'>Voltar ao Vitrine Certa</a></body></html>");
+    res.type("html").send("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Mercado Livre conectado</title><body style='font:16px system-ui;max-width:560px;margin:12vh auto;padding:24px;color:#28232a'><h2>Autorização recebida</h2><p>O Mercado Livre foi conectado à Vitrine Certa. A autorização é armazenada de forma criptografada no banco quando ele está configurado.</p><p>Volte ao painel para verificar o status. A conexão será renovada automaticamente enquanto a autorização continuar válida.</p><a href='/'>Voltar ao Vitrine Certa</a></body></html>");
   } catch (e) { res.status(e.status || 500).send("Não foi possível concluir a conexão: " + String(e.message)); }
 });
 
