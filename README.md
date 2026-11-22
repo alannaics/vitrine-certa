@@ -1,44 +1,27 @@
-# Vitrine Certa
+# Vitrine Certa 2.0
 
-Painel de gestão de conteúdo e resultados de afiliados no Brasil.
+Plataforma de curadoria de ofertas de afiliados, com painel administrativo, vitrine pública, rastreamento de cliques e apoio à produção de conteúdo.
 
 ## Funcionalidades
-- Painel de cliques, vendas, comissão e conversão.
-- Cadastro de produtos e links de afiliado para Shopee e Mercado Livre.
-- Calendário editorial de 30 dias e biblioteca de roteiros.
-- Gerador de link curto Shopee pela Open API, quando as credenciais estiverem configuradas.
-- Busca de ofertas Shopee pela API e consulta de relatório de conversões disponíveis no backend.
-- Exportação CSV e armazenamento local do catálogo e métricas manuais.
 
-## Publicar o servidor gratuitamente no Render
-O GitHub Pages não executa o backend e não pode guardar credenciais secretas. Publique pelo Render usando o Blueprint deste repositório:
+- Painel principal em `/` e `/v2`.
+- Vitrine e gestão de ofertas em `/ofertas`.
+- Cadastro, edição, publicação e despublicação de ofertas, com links HTTPS fornecidos pelo administrador.
+- Redirecionamento rastreado em `/go/:id`, sem coleta de IP ou cookies para essa contagem.
+- Relatório protegido de cliques em `/api/v2/clicks`.
+- Financeiro com registros manuais de comissões efetivamente recebidas e despesas.
+- Integrações externas opcionais; nenhuma fonte de produtos é considerada afiliada sem autorização e atribuição comprovada.
 
-1. Entre em https://render.com/ e conecte o GitHub.
-2. Crie um **Blueprint** e selecione este repositório.
-3. O Render lerá `render.yaml` e criará o serviço web.
-4. Nas variáveis de ambiente do serviço, configure `SHOPEE_APP_ID`, `SHOPEE_APP_SECRET` e `DASHBOARD_API_TOKEN`. Insira os valores diretamente no painel privado do Render — nunca no GitHub, no HTML ou no chat.
-5. Aguarde o deploy. O painel e as rotas `/api/*` serão servidos pelo mesmo endereço.
+## Implantação
 
-O plano gratuito do Render pode suspender o serviço após inatividade; a primeira abertura depois disso pode demorar. Consulte as condições atuais do plano antes de depender de sincronizações agendadas.
+Aplicação Node.js/Express com PostgreSQL. Configure `DATABASE_URL` e `DASHBOARD_API_TOKEN` no ambiente privado do Render. Não compartilhe tokens, senhas ou segredos em código, capturas de tela ou mensagens.
 
-## Shopee
-O backend assina as requisições no servidor com SHA-256 e usa a Open API Affiliate GraphQL da Shopee. Rotas implementadas:
-- `GET /api/status`
-- `POST /api/shopee/short-link` com `originUrl` e `subIds`
-- `GET /api/shopee/products?keyword=...&page=1&limit=20`
-- `GET /api/shopee/conversions?start=UNIX_SECONDS&end=UNIX_SECONDS`
+Para usar o gerador de conteúdo, configure as credenciais correspondentes ao provedor de IA já integrado no backend.
 
-A disponibilidade de campos e operações depende da versão e permissões liberadas pela Shopee. A API pode recusar operações ou campos não habilitados para a conta. O painel deve ser validado com suas credenciais antes de considerar a integração operacional.
+## Limitações
 
-## Mercado Livre
-O catálogo aceita links de afiliado gerados no painel oficial do Mercado Livre. Não implementamos acesso por cookies, senha ou sessão do navegador. Não há API pública de afiliados documentada e confirmada para consulta direta de comissões nesta versão; métricas do Mercado Livre devem ser inseridas manualmente ou importadas de relatórios exportados quando essa função for adicionada.
+O sistema registra cliques, não vendas. Links cadastrados não são verificados automaticamente quanto à elegibilidade de comissão, disponibilidade ou preço. Publicação automática em redes sociais exige autorização específica dos respectivos canais. Não há promessa de lucro.
 
-## Segurança
-- Nunca adicione credenciais ao repositório público.
-- As credenciais Shopee são lidas exclusivamente de variáveis de ambiente do backend.
-- Não compartilhe App Secret, senha da conta, cookies ou tokens em conversas.
-- Se um segredo for publicado acidentalmente, revogue-o/regenere-o na Shopee.
-- As rotas privadas da Shopee exigem `DASHBOARD_API_TOKEN`. Informe o mesmo token no campo privado da tela de conexões; ele permanece apenas na sessão atual do navegador. O frontend guarda os dados de catálogo e métricas no armazenamento local do navegador; faça backup CSV.
+## Desenvolvimento
 
-## Observações
-Os produtos de exemplo são apenas ideias de pesquisa, não ofertas verificadas. Confirme preço final com frete, estoque, reputação, avaliações, prazos e comissão nos marketplaces antes de divulgar.
+`npm install` e `npm run check` para verificações disponíveis no projeto.
