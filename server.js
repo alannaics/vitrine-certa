@@ -261,13 +261,24 @@ app.get("/api/mercadolivre/products", async (req, res) => {
       error.status = response.status; throw error;
     }
     const raw = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
+    const photoUrl = value => {
+      if (!value) return "";
+      if (typeof value === "string") {
+        if (/^https?:\/\//i.test(value)) return value.replace(/^http:\/\//i,"https://");
+        if (/^[A-Za-z0-9_-]{12,}$/.test(value)) return "https://http2.mlstatic.com/D_NQ_NP_2X_" + value + "-O.webp";
+        return "";
+      }
+      if (Array.isArray(value)) return photoUrl(value[0]);
+      if (typeof value === "object") return photoUrl(value.secure_url || value.url || value.thumbnail || value.id || value.picture_id);
+      return "";
+    };
     const candidates = raw.map(item => {
       const winner = item.buy_box_winner || item.buyBoxWinner || {};
       const pics = item.pictures || item.main_picture || [];
-      const pic = Array.isArray(pics) ? pics[0]?.url || pics[0]?.secure_url : pics?.url || pics?.secure_url;
+      const pic = photoUrl(pics) || photoUrl(item.main_picture) || photoUrl(item.thumbnail) || photoUrl(winner.thumbnail);
       return { catalogId: item.id || null, itemId: winner.item_id || winner.itemId || winner.id || item.item_id || item.itemId || null,
         title: item.name || item.title || winner.title || "", price: winner.price ?? item.price ?? item.price_info?.price ?? null,
-        permalink: winner.permalink || item.permalink || "", thumbnail: pic || winner.thumbnail || null,
+        permalink: winner.permalink || item.permalink || "", thumbnail: pic || null,
         rating: item.rating?.average ?? winner.rating_average ?? null, category: item.domain_id || item.category_id || "Mercado Livre" };
     }).filter(item => item.title && item.catalogId);
     const checked = await Promise.allSettled(candidates.slice(0, 30).map(async item => {
@@ -276,6 +287,7 @@ app.get("/api/mercadolivre/products", async (req, res) => {
       if (!itemId) {
         const productResponse = await fetch("https://api.mercadolibre.com/products/" + encodeURIComponent(item.catalogId), { headers });
         const productDetail = await productResponse.json().catch(() => ({}));
+        if(productResponse.ok){item.thumbnail = item.thumbnail || photoUrl(productDetail.pictures) || photoUrl(productDetail.main_picture) || photoUrl(productDetail.thumbnail);item.price = item.price ?? productDetail.buy_box_winner?.price ?? null;}
         if (productResponse.ok) {
           const winner = productDetail.buy_box_winner || productDetail.buyBoxWinner || {};
           itemId = winner.item_id || winner.itemId || winner.id || null;
@@ -301,7 +313,7 @@ app.get("/api/mercadolivre/products", async (req, res) => {
       } catch (_) {}
       return { listing: { ...item, id: detail.id, title: detail.title || item.title,
         price: Number(detail.price ?? item.price) || null, permalink: detail.permalink || item.permalink,
-        thumbnail: detail.thumbnail || item.thumbnail, sold_quantity: Number(detail.sold_quantity) || 0,
+        thumbnail: photoUrl(detail.pictures) || photoUrl(detail.thumbnail) || item.thumbnail, sold_quantity: Number(detail.sold_quantity) || 0,
         available_quantity: Number(detail.available_quantity) || 0, listing_status: detail.status,
         sellerId: detail.seller_id || null, sellerName: seller?.nickname || null,
         sellerReputation: seller?.seller_reputation?.level_id || null,
