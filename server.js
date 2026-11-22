@@ -189,6 +189,24 @@ async function ensureMlToken() {
 }
 
 registerCatalog(app, ensureMlToken);
+// Operational readiness: no invented sales, no exposure of credentials.
+app.get("/api/automation/readiness", requireDashboardToken, async (_req,res) => {
+  const checks={
+    database:{ready:false},
+    mercadoLivreOAuth:{ready:mlConfigured()&&Boolean(mlRefreshToken)},
+    shopeeOffers:{ready:Boolean(APP_ID&&APP_SECRET)},
+    affiliateAttribution:{ready:false,reason:"A API OAuth de vendedor não confirma atribuição de comissões do programa de afiliados."},
+    autonomousPublishing:{ready:false,reason:"Nenhum canal de publicação automática autorizado está configurado."}
+  };
+  if(db){try{await db.query("SELECT 1");checks.database.ready=true}catch{checks.database.reason="Falha na conexão com o banco."}}
+  else checks.database.reason="Banco não configurado.";
+  const blockers=[];
+  if(!checks.database.ready)blockers.push("database");
+  if(!checks.shopeeOffers.ready)blockers.push("shopee_credentials");
+  if(!checks.affiliateAttribution.ready)blockers.push("affiliate_attribution");
+  if(!checks.autonomousPublishing.ready)blockers.push("publishing_channel");
+  res.json({readyForAutonomousSales:false,checks,blockers,verifiedAt:new Date().toISOString(),note:"Dados de produtos e vendas atribuídas são integrações distintas. Nenhuma venda é presumida."});
+});
 app.get("/api/status", (_req, res) => {
   res.json({
     database: { configured: Boolean(db) },
