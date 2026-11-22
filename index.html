@@ -412,9 +412,9 @@ async function searchDiscoveryProducts(){
   const available=[
    {id:"relevance",label:"Relevância",yes:true},
    {id:"price",label:"Menor preço",yes:displayable.some(p=>numeric(p,["priceMin","price"]))},
-   {id:"sales",label:"Mais vendidos",yes:all.some(p=>numeric(p,["sales","sold_quantity","soldQuantity"]))},
-   {id:"rating",label:"Melhor avaliação",yes:all.some(p=>numeric(p,["ratingStar","rating"]))},
-   {id:"commission",label:"Maior comissão",yes:all.some(p=>numeric(p,["commissionRate","commission"]))},
+   {id:"sales",label:"Mais vendidos",yes:displayable.some(p=>numeric(p,["sales","sold_quantity","soldQuantity"]))},
+   {id:"rating",label:"Melhor avaliação",yes:displayable.some(p=>numeric(p,["ratingStar","rating"]))},
+   {id:"commission",label:"Maior comissão",yes:displayable.some(p=>numeric(p,["commissionRate","commission"]))},
    {id:"score",label:"Sinais comerciais",yes:displayable.some(p=>commercialOfferScore(p).known>0)}
   ];
   const controls=document.createElement("div");controls.className="vc-sort-controls";
