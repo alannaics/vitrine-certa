@@ -257,8 +257,8 @@ app.get("/api/mercadolivre/products", async (req, res) => {
     const token = await ensureMlToken();
     const headers = { Accept: "application/json", Authorization: "Bearer " + token, "User-Agent": "VitrineCerta/1.0" };
     const url = new URL("https://api.mercadolibre.com/products/search");
-    url.search = new URLSearchParams({ site_id: "MLB", q: query, limit: "50" }).toString();
-    const response = await fetch(url, { headers });
+    url.search = new URLSearchParams({ site_id: "MLB", status: "active", q: query, limit: "50" }).toString();
+    const response = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(data.message || data.error || "A API de produtos do Mercado Livre respondeu HTTP " + response.status + ".");
@@ -347,8 +347,8 @@ app.get("/api/mercadolivre/products", async (req, res) => {
     const catalogOnly = checked.filter(x => x.status === "fulfilled" && x.value?.catalog)
       .map(x => ({ ...x.value.catalog, sold_quantity: null, available_quantity: null, listing_status: "catalog",
         availabilityVerified: false, availabilityNote: "Produto de catálogo sem anúncio vencedor confirmado. Não é possível afirmar ranking de vendas ou estoque." }));
-    const products = verified.sort((a,b) => (Number(b.sold_quantity)||0) - (Number(a.sold_quantity)||0));
-    const payload={ products, catalogProducts: catalogOnly, count: products.length, verifiedCount: verified.length, catalogCount: catalogOnly.length,
+    const products = verified.filter(p => p.thumbnail && Number.isFinite(Number(p.price)) && Number(p.price)>0 && /^https:\/\//.test(String(p.permalink||""))).sort((a,b) => (Number(b.sold_quantity)||0) - (Number(a.sold_quantity)||0));
+    const payload={ products, catalogProducts: catalogOnly, count: products.length, verifiedCount: products.length, catalogCount: catalogOnly.length,
       source: "API oficial de catálogo e anúncios do Mercado Livre",
       ranking: "Anúncios ativos com estoque confirmado, ordenados pelas vendas reportadas; catálogo sem anúncio confirmado aparece separado.",
       updatedAt: new Date().toISOString() };
