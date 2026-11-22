@@ -431,7 +431,8 @@ async function searchDiscoveryProducts(){
   const grid=document.createElement("div");grid.id="discoveryProductCards";grid.className="vc-market-grid";
   results.replaceChildren(controls,grid);
   renderDiscoveryProductCards();
-  const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);\n  const catalogOnly=all.length>0&&all.every(p=>p.resultType==="catalog");
+  const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);
+  const catalogOnly=all.length>0&&all.every(p=>p.resultType==="catalog");
   status.textContent=all.length+" resultado(s) listado(s) para \""+query+"\". "+groups.filter(g=>g.items.length).map(g=>g.market+": "+g.items.length).join(" · ")+(errors.length?" | Indisponível: "+errors.join(" | "):"")+(catalogOnly?" São referências de catálogo, sem fotos e preços confirmados.":"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
  }catch(e){status.textContent=e.message;}
  finally{button.disabled=false;}
