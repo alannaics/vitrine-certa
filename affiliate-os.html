@@ -43,6 +43,14 @@
       <button type="button" class="btn secondary" id="rankingAccess">Validar acesso</button>
     </div>
     <p class="muted workspace-status" id="rankingStatus" role="status">Valide o acesso administrativo em Integrações.</p>
+    <form id="discoveryFilters" class="workspace-controls">
+      <label>Preço mínimo<input id="minDiscoveryPrice" class="field" type="number" min="0" step="0.01"></label>
+      <label>Preço máximo<input id="maxDiscoveryPrice" class="field" type="number" min="0" step="0.01"></label>
+      <label><input id="discoveryFreeShipping" type="checkbox"> Frete grátis</label>
+      <button class="btn secondary" type="submit">Aplicar filtros</button>
+    </form>
+    <p id="estimatedPricesStatus" class="muted" role="status"></p>
+    <button class="btn secondary" id="estimateMore" type="button" hidden>Estimar mais preços com IA</button>
     <div id="missingPrices" class="actions" hidden><button type="button" class="btn secondary" id="showRelevant">Ver resultados por relevância</button><a class="btn secondary" id="openMarketplaceSearch" target="_blank" rel="noopener noreferrer">Conferir no Mercado Livre</a></div>
     <div id="rankingCards" class="offers"></div>
   </div>
@@ -120,4 +128,4 @@ $("importLinks").onclick=async()=>{if(!authToken){message("Valide o token admini
 $("verifyToken").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token.",true);return}try{await request("/api/automation/readiness");$("integrationState").textContent="Token validado. Seu acesso está disponível nesta aba.";sessionStorage.setItem("vcDashboardToken",authToken);message("Acesso administrativo validado.");await Promise.all([loadAdmin(),loadDrafts(),loadRanking(),loadCommissions()])}catch(e){$("integrationState").textContent=e.message;message(e.message,true)}};
 $("connectMl").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token administrativo.",true);return}try{const d=await request("/api/mercadolivre/auth-url",{method:"POST",body:"{}"});if(d.authorizationUrl)location.assign(d.authorizationUrl)}catch(e){message(e.message,true)}};
 loadOffers();loadStatus();
-</script><script src="/affiliate-workspace.js?v=confirmed-stock"></script></body></html>
+</script><script src="/affiliate-workspace.js?v=gemini-filters"></script></body></html>

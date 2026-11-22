@@ -112,7 +112,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
         priceSource: publicPrice !== null ? "product-page" : null,
         originalPrice: sale?.currency_id === "BRL" ? priceInReais(sale.regular_amount, "BRL") : priceInReais(winner.original_price, winner.currency_id),
         installments: installmentsInReais(winner.installments || listing.installments),
-        url: listing.permalink
+        freeShipping: listing.shipping?.free_shipping === true, url: listing.permalink
       };
     }));
     return results.filter(row => row?.title);
@@ -145,7 +145,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
           const listing = await get("/items/" + row.id, token).catch(() => null);
           if (!hasStock(listing)) return null;
           return {
-          id: row.id, type: "ITEM", title: row.thumbnail || null, url: listing.permalink,
+          id: row.id, type: "ITEM", title: listing.title || row.title, image: listing.secure_thumbnail || row.thumbnail || null, freeShipping: listing.shipping?.free_shipping === true, url: listing.permalink,
           price: priceInReais(row.price, row.currency_id) ?? priceInReais(listing.price, listing.currency_id),
           originalPrice: priceInReais(row.original_price, row.currency_id),
           installments: installmentsInReais(row.installments)
@@ -191,7 +191,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
       priceSource: publicPrice !== null ? "product-page" : null,
       originalPrice: sale?.currency_id === "BRL" ? priceInReais(sale.regular_amount, "BRL") : priceInReais(item.original_price, item.currency_id),
       installments: installmentsInReais(item.installments || winner?.installments),
-      url: listing.permalink
+      freeShipping: listing.shipping?.free_shipping === true, url: listing.permalink
     };
   }
 

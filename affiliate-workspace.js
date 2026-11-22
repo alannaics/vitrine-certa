@@ -2,6 +2,7 @@ const categoryPath = $("categoryPath");
 const rankingStatus = $("rankingStatus");
 const rankingCards = $("rankingCards");
 let rankingVersion = 0;
+let pendingEstimates = [];
 let selectedProduct = null;
 let shareText = "";
 
@@ -102,6 +103,7 @@ function rankingCard(product, category) {
   rank.textContent = product.position ? product.position + "º no ranking oficial" : "";
   const title = document.createElement("strong");
   title.textContent = product.title || product.id + " · detalhes indisponíveis";
+  if (product.freeShipping) { const shipping = document.createElement("small"); shipping.textContent = "Frete grátis"; body.append(shipping); }
   if (product.position) {
     if (product.category) rank.textContent += " · " + product.category;
     body.append(rank);
@@ -133,6 +135,7 @@ function rankingCard(product, category) {
     const note = document.createElement("small");
     note.textContent = "Preço disponível no anúncio";
     body.append(note);
+    pendingEstimates.push({ id: product.id, title: product.title, note });
   }
   if (url) {
     const link = document.createElement("a");
@@ -187,6 +190,9 @@ async function refreshCreativePrice(product) {
 async function loadRanking() {
   const current = ++rankingVersion;
   rankingCards.replaceChildren();
+  pendingEstimates = [];
+  $("estimatedPricesStatus").textContent = "";
+  $("estimateMore").hidden = true;
   $("missingPrices").hidden = true;
   rankingStatus.textContent = "Consultando o Mercado Livre…";
   try {
@@ -222,6 +228,12 @@ async function loadRanking() {
       const words = normalize(term).split(/\s+/);
       products = products.filter(product => words.every(word => normalize(product.title).includes(word)));
     }
+    const min = $("minDiscoveryPrice").value;
+    const max = $("maxDiscoveryPrice").value;
+    if (min && max && Number(min) > Number(max)) throw Error("O preço máximo deve ser maior ou igual ao mínimo.");
+    if ($("discoveryFreeShipping").checked) products = products.filter(product => product.freeShipping);
+    if (min || max) products = products.filter(product => product.price > 0 &&
+      (!min || product.price >= Number(min)) && (!max || product.price <= Number(max)));
     let missing = 0;
     if (sort === "priceAsc" || sort === "priceDesc") {
       const direction = sort === "priceAsc" ? 1 : -1;
@@ -239,9 +251,10 @@ async function loadRanking() {
       ? source + " · " + products.length + " resultado(s)" + (ranked && term ? " no ranking para esta palavra-chave" : "")
       : ranked ? source + " · Nenhum produto encontrado. Tente outra palavra-chave ou subcategoria."
       : source + " · Nenhum produto encontrado. Tente outra palavra-chave ou categoria.";
-    if (!products.length && !missing) rankingStatus.textContent = source + " · Nenhum anúncio ativo com estoque confirmado nesta consulta.";
+    if (!products.length && !missing) rankingStatus.textContent = source + " · Nenhum anúncio confirmado atende a esta busca e aos filtros.";
     if (missing) rankingStatus.textContent = source + " · " + products.length + " com preço consultado. " + missing + " sem preço ficam na lista por relevância.";
     rankingCards.append(...products.map(product => rankingCard(product, categoryName)));
+    if (pendingEstimates.length) estimatePrices(current);
   } catch (error) {
     if (current === rankingVersion) rankingStatus.textContent = error.message;
   }
@@ -249,6 +262,38 @@ async function loadRanking() {
 
 categoryPath.onchange = ({ target }) => {
   while (target.nextElementSibling) target.nextElementSibling.remove();
+  loadRanking();
+};
+async function estimatePrices(version) {
+  const status = $("estimatedPricesStatus");
+  const button = $("estimateMore");
+  const batch = pendingEstimates.splice(0, 12);
+  if (!batch.length) return;
+  button.hidden = true;
+  status.textContent = "Consultando faixas de preço estimadas por IA…";
+  try {
+    const { estimates } = await request("/api/gemini/estimate-prices", {
+      method: "POST", body: JSON.stringify({ items: batch.map(({ id, title }) => ({ id, title })) })
+    });
+    if (version !== rankingVersion) return;
+    for (const { id, note } of batch) {
+      const estimate = estimates[id];
+      if (estimate) note.textContent = "Preço estimado (IA) · " + currency(estimate.minPrice) + " a " + currency(estimate.maxPrice);
+    }
+    status.textContent = Object.keys(estimates).length
+      ? "As faixas de IA são referências. Confira o valor real no anúncio."
+      : "A IA não retornou uma faixa para esses produtos.";
+  } catch (error) {
+    if (version !== rankingVersion) return;
+    pendingEstimates.unshift(...batch);
+    status.textContent = error.message;
+  }
+  button.hidden = pendingEstimates.length === 0;
+}
+
+$("estimateMore").onclick = () => estimatePrices(rankingVersion);
+$("discoveryFilters").onsubmit = event => {
+  event.preventDefault();
   loadRanking();
 };
 $("rankingRefresh").onclick = loadRanking;

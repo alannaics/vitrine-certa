@@ -719,6 +719,100 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
   } catch (e) { console.error("Gemini generation failed:", e); res.status(502).json({ error: "Falha na comunicação com o serviço de IA: " + (e.message || "erro desconhecido") }); }
 });
 
+const priceEstimateCache = new Map();
+
+app.post("/api/gemini/estimate-prices", requireDashboardToken, async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(503).json({ error: "Configure GEMINI_API_KEY no Render para estimar preços." });
+    }
+    const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 25) : [];
+    if (!items.length) {
+      return res.status(400).json({ error: "Envie ao menos um produto para estimativa." });
+    }
+
+    const results = {};
+    const toQuery = [];
+
+    for (const raw of items) {
+      const id = String(raw?.id || "").trim();
+      const title = String(raw?.title || "").trim().slice(0, 180);
+      if (!/^MLBU?\d+$/.test(id) || !title) continue;
+      const key = id + ":" + title.toLocaleLowerCase("pt-BR");
+      const cached = priceEstimateCache.get(key);
+      if (cached && Date.now() - cached.time < 24 * 60 * 60 * 1000) {
+        results[id] = cached.estimate;
+      } else {
+        toQuery.push({ id, title, key });
+      }
+    }
+
+    if (toQuery.length > 0) {
+      const prompt = [
+        "Você é um analista de precificação de e-commerce no Brasil (Mercado Livre).",
+        "Para cada produto listado abaixo, estime a faixa típica de preço de varejo em Reais (BRL) no Brasil.",
+        "Responda EXCLUSIVAMENTE com um JSON válido no formato de array, sem markdown, sem explicações extras:",
+        '[{"id":"...","minPrice":0,"avgPrice":0,"maxPrice":0,"confidence":"alta|media|baixa"}]',
+        "Produtos:",
+        ...toQuery.map(item => `- id: "${item.id}" | produto: "${item.title}"`)
+      ].join("\n");
+
+      const model = "gemini-3.1-flash-lite";
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: 1500,
+            responseMimeType: "application/json"
+          }
+        }),
+        signal: AbortSignal.timeout(20000)
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return res.status(502).json({ error: "O Gemini está indisponível para estimar preços agora." });
+      {
+        const rawText = (data.candidates || [])
+          .flatMap(c => c.content?.parts || [])
+          .map(p => p.text || "")
+          .join("")
+          .trim();
+
+        const parsed = JSON.parse(rawText);
+        if (Array.isArray(parsed)) {
+          for (const entry of parsed) {
+            const match = toQuery.find(q => q.id === String(entry.id));
+            const avg = Number(entry.avgPrice);
+            const min = Number(entry.minPrice);
+            const max = Number(entry.maxPrice);
+            if (match && Number.isFinite(min) && Number.isFinite(avg) && Number.isFinite(max) && min > 0 && min <= avg && avg <= max && max <= 1000000) {
+              const estimate = {
+                minPrice: Number.isFinite(min) && min > 0 ? Math.round(min * 100) / 100 : null,
+                avgPrice: Math.round(avg * 100) / 100,
+                maxPrice: Number.isFinite(max) && max > 0 ? Math.round(max * 100) / 100 : null,
+                confidence: ["alta", "media", "baixa"].includes(entry.confidence) ? entry.confidence : "media",
+                estimated: true
+              };
+              if (priceEstimateCache.size > 500) priceEstimateCache.clear();
+              priceEstimateCache.set(match.key, { time: Date.now(), estimate });
+              results[match.id] = estimate;
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ estimates: results, source: "Estimativa referencial via Gemini IA" });
+  } catch (error) {
+    console.error("[gemini-estimate-prices]", error.message);
+    res.status(502).json({ error: "Não foi possível gerar estimativa de preços agora." });
+  }
+});
+
+
 app.get("/api/dashboard/state", requireDashboardToken, async (_req, res) => {
   if (!db) return res.status(503).json({ error: "Banco de dados não configurado." });
   try {
