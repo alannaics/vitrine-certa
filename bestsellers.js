@@ -69,6 +69,12 @@ function registerBestsellers(app, authenticate, ensureToken) {
     }
   }
 
+  function hasStock(item) {
+    return item?.status === "active" && Number(item.available_quantity) > 0 &&
+      !item.sub_status?.includes("out_of_stock") && typeof item.permalink === "string" &&
+      /^https:\/\/(?:[\w-]+\.)?mercadolivre\.com\.br\//i.test(item.permalink);
+  }
+
   async function searchCatalog(term, category, token) {
     const params = new URLSearchParams({ site_id: "MLB", status: "active", q: term, limit: "20" });
     const data = await get("/products/search?" + params, token);
@@ -87,8 +93,9 @@ function registerBestsellers(app, authenticate, ensureToken) {
         ? row : await get("/products/" + row.id, token).catch(() => row);
       const winner = item.buy_box_winner || row.buy_box_winner || {};
       const listingId = winner.item_id;
-      const listing = category && !winner.category_id && categoryId.test(listingId)
-        ? await get("/items/" + listingId, token).catch(() => ({})) : {};
+      if (!categoryId.test(listingId)) return null;
+      const listing = await get("/items/" + listingId, token).catch(() => null);
+      if (!hasStock(listing)) return null;
       if (!await inCategory(winner.category_id || listing.category_id || item.category_id || row.category_id)) return null;
       const picture = item.pictures?.[0] || row.pictures?.[0];
       const price = priceInReais(winner.price, winner.currency_id) ?? priceInReais(listing.price, listing.currency_id);
@@ -105,7 +112,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
         priceSource: publicPrice !== null ? "product-page" : null,
         originalPrice: sale?.currency_id === "BRL" ? priceInReais(sale.regular_amount, "BRL") : priceInReais(winner.original_price, winner.currency_id),
         installments: installmentsInReais(winner.installments || listing.installments),
-        url: listing.permalink || winner.permalink || "https://www.mercadolivre.com.br/p/" + row.id
+        url: listing.permalink
       };
     }));
     return results.filter(row => row?.title);
@@ -131,15 +138,21 @@ function registerBestsellers(app, authenticate, ensureToken) {
       const token = await ensureToken();
       const params = new URLSearchParams({ q: term, limit: "20" });
       if (category) params.set("category", category);
+      if (["price_asc", "price_desc"].includes(req.query.sort)) params.set("sort", req.query.sort);
       try {
         const data = await get("/sites/MLB/search?" + params, token);
-        const products = (data.results || []).filter(row => categoryId.test(row.id) && row.title).map(row => ({
-          id: row.id, type: "ITEM", title: row.thumbnail || null, url: row.permalink || null,
-          price: priceInReais(row.price, row.currency_id),
+        const products = await Promise.all((data.results || []).filter(row => categoryId.test(row.id) && row.title).map(async row => {
+          const listing = await get("/items/" + row.id, token).catch(() => null);
+          if (!hasStock(listing)) return null;
+          return {
+          id: row.id, type: "ITEM", title: row.thumbnail || null, url: listing.permalink,
+          price: priceInReais(row.price, row.currency_id) ?? priceInReais(listing.price, listing.currency_id),
           originalPrice: priceInReais(row.original_price, row.currency_id),
           installments: installmentsInReais(row.installments)
+          };
         }));
-        return res.json({ products, source: "marketplace" });
+        const confirmed = products.filter(Boolean);
+        if (confirmed.length || !data.results?.length) return res.json({ products: confirmed, source: "marketplace" });
       } catch (error) {
         if (![401, 403, 404].includes(error.status)) throw error;
       }
@@ -162,20 +175,23 @@ function registerBestsellers(app, authenticate, ensureToken) {
     const picture = item.pictures?.[0];
     const winner = item.buy_box_winner;
     const listingId = type === "ITEM" && /^MLB\d+$/.test(id) ? id : winner?.item_id;
-    const sale = lookupPrice && /^MLB\d+$/.test(listingId)
+    if (!categoryId.test(listingId)) return null;
+    const listing = type === "ITEM" ? item : await get("/items/" + listingId, token).catch(() => null);
+    if (!hasStock(listing)) return null;
+    const sale = lookupPrice && priceInReais(listing.price, listing.currency_id) === null
       ? await get("/items/" + listingId + "/sale_price?context=channel_marketplace", token).catch(() => null)
       : null;
     const apiPrice = (sale?.currency_id === "BRL" ? priceInReais(sale.amount, "BRL") : null)
-      ?? priceInReais(item.price, item.currency_id) ?? priceInReais(winner?.price, winner?.currency_id);
+      ?? priceInReais(listing.price, listing.currency_id) ?? priceInReais(winner?.price, winner?.currency_id);
     const publicPrice = lookupPrice && apiPrice === null && type === "PRODUCT" ? await publicCatalogPrice(id) : null;
     return {
-      id, position, type, title: item.title || item.name || null,
+      id, position, type, listingId, title: item.title || item.name || null,
       image: picture?.secure_url || picture?.url || item.secure_thumbnail || null,
       price: apiPrice ?? publicPrice,
       priceSource: publicPrice !== null ? "product-page" : null,
       originalPrice: sale?.currency_id === "BRL" ? priceInReais(sale.regular_amount, "BRL") : priceInReais(item.original_price, item.currency_id),
       installments: installmentsInReais(item.installments || winner?.installments),
-      url: item.permalink || (type === "PRODUCT" ? "https://www.mercadolivre.com.br/p/" + id : null)
+      url: listing.permalink
     };
   }
 
@@ -206,19 +222,23 @@ function registerBestsellers(app, authenticate, ensureToken) {
     }
     const products = [];
     const ordered = [...candidates.values()];
+    const listings = new Set();
     for (let i = 0; i < ordered.length && products.length < 100; i += 20) {
       const batch = await Promise.all(ordered.slice(i, i + 20).map(async entry => {
-        const row = await productDetails(entry, token, false);
+        const row = await productDetails(entry, token);
         return row?.title ? { ...row, category: entry.category } : null;
       }));
-      products.push(...batch.filter(Boolean));
+      for (const product of batch.filter(Boolean)) {
+        if (listings.has(product.listingId)) continue;
+        listings.add(product.listingId);
+        products.push(product);
+      }
     }
-    if (!products.length) throw Error("Nenhum ranking de categoria retornou produtos agora.");
     return { products: products.slice(0, 100), updatedAt: new Date().toISOString() };
   }
 
   app.get("/api/mercadolivre/selection", authenticate, async (_req, res) => {
-    if (selectionCache && Date.now() - Date.parse(selectionCache.updatedAt) < 10 * 60 * 1000) {
+    if (selectionCache && Date.now() - Date.parse(selectionCache.updatedAt) < 60 * 1000) {
       return res.json(selectionCache);
     }
     try {
@@ -241,7 +261,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
     }
     try {
       const row = await productDetails({ id, type, position: 0 }, await ensureToken());
-      res.json({ price: row?.price ?? null });
+      res.json({ price: row?.price ?? null, available: Boolean(row) });
     } catch (error) {
       handleError(res, error);
     }

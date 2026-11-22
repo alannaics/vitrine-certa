@@ -120,4 +120,4 @@ $("importLinks").onclick=async()=>{if(!authToken){message("Valide o token admini
 $("verifyToken").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token.",true);return}try{await request("/api/automation/readiness");$("integrationState").textContent="Token validado. Seu acesso está disponível nesta aba.";sessionStorage.setItem("vcDashboardToken",authToken);message("Acesso administrativo validado.");await Promise.all([loadAdmin(),loadDrafts(),loadRanking(),loadCommissions()])}catch(e){$("integrationState").textContent=e.message;message(e.message,true)}};
 $("connectMl").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token administrativo.",true);return}try{const d=await request("/api/mercadolivre/auth-url",{method:"POST",body:"{}"});if(d.authorizationUrl)location.assign(d.authorizationUrl)}catch(e){message(e.message,true)}};
 loadOffers();loadStatus();
-</script><script src="/affiliate-workspace.js?v=automatic-selection"></script></body></html>
+</script><script src="/affiliate-workspace.js?v=confirmed-stock"></script></body></html>

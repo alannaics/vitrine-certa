@@ -208,16 +208,12 @@ async function loadRanking() {
         categorySelect(detail.categories, "Escolher subcategoria");
       }
     }).catch(() => {});
-    if (!term && !category) {
-      const { products } = await request("/api/mercadolivre/selection");
-      if (current !== rankingVersion) return;
-      rankingStatus.textContent = products.length + " produtos para trabalhar · Seleção dos mais vendidos por categoria";
-      rankingCards.append(...products.map(product => rankingCard(product, product.category)));
-      return;
-    }
-    if (ranked && !category) throw Error("Escolha uma categoria para consultar o ranking oficial.");
-    const path = ranked ? "/api/mercadolivre/bestsellers?category=" + category
-      : "/api/mercadolivre/search?q=" + encodeURIComponent(term) + (category ? "&category=" + category : "");
+    const automatic = !category && (!term || sort === "bestsellers");
+    const marketplaceSort = { priceAsc: "price_asc", priceDesc: "price_desc" }[sort];
+    const path = automatic ? "/api/mercadolivre/selection"
+      : ranked ? "/api/mercadolivre/bestsellers?category=" + category
+      : "/api/mercadolivre/search?q=" + encodeURIComponent(term) + (category ? "&category=" + category : "") +
+        (marketplaceSort ? "&sort=" + marketplaceSort : "");
     const response = await request(path);
     if (current !== rankingVersion) return;
     let products = response.products;
@@ -237,12 +233,13 @@ async function loadRanking() {
         $("missingPrices").hidden = false;
       }
     }
-    const source = ranked ? "Top 20 oficial · " + categoryName
+    const source = automatic ? "Seleção automática · Estoque verificado" : ranked ? "Top 20 oficial · " + categoryName
       : response.source === "catalog" ? "Catálogo do Mercado Livre" : "Busca do Mercado Livre";
     rankingStatus.textContent = products.length
       ? source + " · " + products.length + " resultado(s)" + (ranked && term ? " no ranking para esta palavra-chave" : "")
       : ranked ? source + " · Nenhum produto encontrado. Tente outra palavra-chave ou subcategoria."
       : source + " · Nenhum produto encontrado. Tente outra palavra-chave ou categoria.";
+    if (!products.length && !missing) rankingStatus.textContent = source + " · Nenhum anúncio ativo com estoque confirmado nesta consulta.";
     if (missing) rankingStatus.textContent = source + " · " + products.length + " com preço consultado. " + missing + " sem preço ficam na lista por relevância.";
     rankingCards.append(...products.map(product => rankingCard(product, categoryName)));
   } catch (error) {
