@@ -34,45 +34,6 @@ app.get("/finance", (req, res) => res.sendFile(path.join(__dirname, req.query.em
 app.get("/catalog", (req, res) => res.sendFile(path.join(__dirname, req.query.embedded === "1" ? "catalog.html" : "studio-home.html")));
 
 const PORT = process.env.PORT || 3000;
-const APP_ID = process.env.SHOPEE_APP_ID;
-const APP_SECRET = process.env.SHOPEE_APP_SECRET;
-const SHOPEE_URL = "https://open-api.affiliate.shopee.com.br/graphql";
-
-function signature(payload) {
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const digest = crypto.createHash("sha256")
-    .update(APP_ID + timestamp + payload + APP_SECRET, "utf8")
-    .digest("hex");
-  return { timestamp, authorization: "SHA256 Credential=" + APP_ID +
-    ", Timestamp=" + timestamp + ", Signature=" + digest };
-}
-
-async function shopeeRequest(query) {
-  if (!APP_ID || !APP_SECRET) {
-    const error = new Error("Shopee ainda não configurada no servidor.");
-    error.status = 503;
-    throw error;
-  }
-  const payload = JSON.stringify({ query });
-  const auth = signature(payload);
-  const response = await fetch(SHOPEE_URL, {
-    method: "POST",
-    headers: {
-      "Authorization": auth.authorization,
-      "Content-Type": "application/json"
-    },
-    body: payload
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.errors?.length) {
-    const error = new Error(data.errors?.map(e => e.message).join("; ") ||
-      "A Shopee retornou HTTP " + response.status);
-    error.status = response.status >= 500 ? 502 : 400;
-    throw error;
-  }
-  return data.data;
-}
-
 function requireDashboardToken(req, res, next) {
   const expected = process.env.DASHBOARD_API_TOKEN;
   const supplied = req.get("x-dashboard-token") || "";
@@ -218,56 +179,11 @@ app.get("/api/status", (_req, res) => {
   });
 });
 
-app.post("/api/shopee/short-link", requireDashboardToken, async (req, res) => {
-  try {
-    const originUrl = String(req.body?.originUrl || "");
-    const subIds = Array.isArray(req.body?.subIds) ? req.body.subIds.slice(0, 5).map(x => String(x).trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 50)).filter(Boolean) : [];
-    let parsed;
-    try { parsed = new URL(originUrl); } catch { return res.status(400).json({ error: "Informe uma URL válida." }); }
-    const host = parsed.hostname.toLowerCase();
-    const allowedHost = host === "shopee.com.br" || host.endsWith(".shopee.com.br") || host === "shopee.com" || host.endsWith(".shopee.com") || host === "shope.ee";
-    if (parsed.protocol !== "https:" || !allowedHost) {
-      return res.status(400).json({ error: "Use um link HTTPS de produto/loja Shopee." });
-    }
-    if (!subIds.length) return res.status(400).json({ error: "Informe ao menos um identificador de campanha." });
-    const escapedUrl = JSON.stringify(originUrl);
-    const escapedSubs = JSON.stringify(subIds);
-    const query = "mutation { generateShortLink(input: { originUrl: " + escapedUrl +
-      ", subIds: " + escapedSubs + " }) { shortLink } }";
-    const data = await shopeeRequest(query);
-    res.json({ shortLink: data?.generateShortLink?.shortLink || null });
-  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
-});
 
-app.get("/api/shopee/products", requireDashboardToken, async (req, res) => {
-  try {
-    const keyword = String(req.query.keyword || "").slice(0, 80).replace(/["\\]/g, "");
-    const page = Math.max(1, Math.min(50, Number(req.query.page) || 1));
-    const limit = Math.max(1, Math.min(50, Number(req.query.limit) || 20));
-    const query = "{ productOfferV2(keyword: " + JSON.stringify(keyword) +
-      ", listType: 0, sortType: 1, page: " + page + ", limit: " + limit +
-      ") { nodes { itemId productName productLink offerLink imageUrl priceMin priceMax " +
-      "priceDiscountRate sales ratingStar commissionRate sellerCommissionRate " +
-      "shopeeCommissionRate commission shopId shopName shopType } pageInfo { page limit hasNextPage } } }";
-    const data = await shopeeRequest(query);
-    const result = data?.productOfferV2 || { nodes: [], pageInfo: {} };
-    const nodes = (result.nodes || [])
-      .slice()
-      .sort((a, b) => {
-        const salesA = Number(a.sales);
-        const salesB = Number(b.sales);
-        if (Number.isFinite(salesA) && Number.isFinite(salesB)) return salesB - salesA;
-        if (Number.isFinite(salesA)) return -1;
-        if (Number.isFinite(salesB)) return 1;
-        return 0;
-      });
-    res.json({ ...result, nodes, ranking: "Produtos ordenados pelas vendas informadas pela API; itens sem dado de vendas aparecem depois.",
-      availabilityVerified: false,
-      availabilityNote: "A API de ofertas consultada não fornece um campo confiável de estoque nesta consulta; confirme a disponibilidade na página do produto." });
-  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
-});
 
-// Public affiliate storefront: only offers supplied with attribution links by the official partner API.
+
+
+// Public affiliate storefront: only approved published offers are displayed.
 
 
 // Track outbound traffic without cookies, IP addresses, or personal identifiers.
@@ -332,44 +248,6 @@ app.delete("/api/v2/manual-offers/:id",requireDashboardToken,async(req,res)=>{
  try{const q=await db.query("DELETE FROM affiliate_offers WHERE id=$1 RETURNING id",[req.params.id]);res.status(q.rowCount?200:404).json({deleted:!!q.rowCount});}
  catch{res.status(500).json({error:"Falha ao excluir."});}
 });
-const publicOfferCache = new Map();
-const PUBLIC_CATEGORIES = Object.freeze({
-  tecnologia: "fone bluetooth", casa: "organizadores casa", beleza: "skincare",
-  moda: "moda feminina", fitness: "acessorios fitness"
-});
-app.get("/api/v2/offers", async (req, res) => {
-  const category = String(req.query.category || "tecnologia");
-  if (!Object.hasOwn(PUBLIC_CATEGORIES, category)) return res.status(400).json({ error: "Categoria inválida." });
-  res.set("Cache-Control", "public, max-age=120");
-  if (!APP_ID || !APP_SECRET) return res.json({ configured: false, source: "shopee_affiliate", offers: [], reason: "Conecte as credenciais oficiais da API de afiliados Shopee." });
-  const cached = publicOfferCache.get(category);
-  if (cached && Date.now() - cached.time < 15 * 60 * 1000) return res.json({ ...cached.payload, cached: true });
-  try {
-    const query = "{ productOfferV2(keyword: " + JSON.stringify(PUBLIC_CATEGORIES[category]) +
-      ", listType: 0, sortType: 1, page: 1, limit: 30) { nodes { itemId productName productLink offerLink imageUrl priceMin priceMax priceDiscountRate sales ratingStar commissionRate shopName } } }";
-    const data = await shopeeRequest(query);
-    const offers = (data?.productOfferV2?.nodes || []).filter(p => {
-      try {
-        const url = new URL(p.offerLink);
-        const host = url.hostname.toLowerCase();
-        return url.protocol === "https:" && (host === "shopee.com.br" || host.endsWith(".shopee.com.br") || host === "shope.ee" || host === "s.shopee.com.br") &&
-          /^https:\/\//.test(String(p.imageUrl || "")) && Number(p.priceMin) > 0 && p.productName;
-      } catch { return false; }
-    }).slice(0, 24).map(p => ({
-      id: String(p.itemId), title: String(p.productName).slice(0, 180),
-      image: p.imageUrl, price: Number(p.priceMin), url: p.offerLink,
-      shop: String(p.shopName || ""), sales: Number(p.sales) || null,
-      commissionRate: Number(p.commissionRate) || null
-    }));
-    const payload = { configured: true, source: "shopee_affiliate", category, offers, affiliateDisclosure: "Podemos receber comissão por compras realizadas através dos links.", stockVerified: false, updatedAt: new Date().toISOString() };
-    publicOfferCache.set(category, { time: Date.now(), payload });
-    return res.json(payload);
-  } catch (error) {
-    console.error("[V2 affiliate feed]", error.message);
-    return res.status(502).json({ error: "A fonte de ofertas está temporariamente indisponível.", source: "shopee_affiliate", offers: [] });
-  }
-});
-
 const mlDiscoveryCache = new Map();
 app.get("/api/mercadolivre/products", async (req, res) => {
   try {
@@ -505,71 +383,15 @@ app.post("/api/affiliate/inspect", requireDashboardToken, async (req, res) => {
       if (!response.ok) throw new Error(item.message || "Mercado Livre respondeu HTTP " + response.status + ".");
       return res.json({ marketplace: "Mercado Livre", name: item.title || name, price: item.price ?? null, category: item.category_id || "", rating: null, sold: item.sold_quantity ?? null, freeShipping: item.shipping?.free_shipping === true, available: item.status === "active" && Number(item.available_quantity || 0) > 0, commission: null, commissionNote: "A API pública de anúncios do Mercado Livre não informa a comissão do seu programa de afiliados. Esse dado precisa vir do painel de afiliados.", source: "API de anúncios do Mercado Livre", updatedAt: new Date().toISOString() });
     }
-    if (host.includes("shopee")) {
-      const keyword = name || decodeURIComponent(parsed.pathname.split("/").filter(Boolean).pop() || "").replace(/[-_]/g, " ").slice(0, 80);
-      if (!keyword) return res.status(422).json({ marketplace: "Shopee", message: "Informe também o nome do produto para consultar a oferta na API de afiliados." });
-      const query = "{ productOfferV2(keyword: " + JSON.stringify(keyword.replace(/["\\]/g, "")) + ", listType: 0, sortType: 1, page: 1, limit: 50) { nodes { itemId productName productLink offerLink imageUrl priceMin priceMax sales ratingStar commissionRate sellerCommissionRate shopeeCommissionRate commission shopId shopName } } }";
-      const data = await shopeeRequest(query);
-      const nodes = data?.productOfferV2?.nodes || [];
-      const idMatch = parsed.pathname.match(/-i\.(\d+)\.(\d+)/);
-      const found = nodes.find(p => idMatch && String(p.itemId) === String(idMatch[2])) || nodes.find(p => (p.productName || "").toLowerCase() === keyword.toLowerCase()) || null;
-      if (!found) return res.json({ marketplace: "Shopee", name, message: "A API não retornou uma oferta correspondente com segurança. Não vou associar comissão de outro produto. Confira se o acesso de afiliado está ativo e tente novamente.", commission: null, source: "Shopee Affiliate Open API" });
-      return res.json({ marketplace: "Shopee", name: found.productName || name, price: found.priceMin ?? found.priceMax ?? null, category: "", rating: found.ratingStar ?? null, sold: found.sales ?? null, freeShipping: null, available: null, commission: found.commissionRate ?? found.sellerCommissionRate ?? found.shopeeCommissionRate ?? found.commission ?? null, commissionNote: "Comissão retornada pela oferta da API; confirme regras e valor final no painel de afiliados.", offerLink: found.offerLink || found.productLink || "", source: "Shopee Affiliate Open API", updatedAt: new Date().toISOString() });
-    }
-    return res.status(422).json({ error: "Domínio não reconhecido. Use um link da Shopee ou do Mercado Livre." });
+    return res.status(422).json({ error: "Domínio não reconhecido. Use um link de um fornecedor compatível." });
   } catch (e) {
     console.error("[affiliate-inspect]", e.message);
     res.status(e.status || 502).json({ error: e.message || "Não foi possível identificar os dados deste link." });
   }
 });
 
-app.get("/api/finance/shopee-summary", requireDashboardToken, async (req,res)=>{
- try{
-  const days=Math.max(1,Math.min(30,Number.parseInt(req.query.days,10)||30));
-  const end=Math.floor(Date.now()/1000),start=end-days*86400;
-  const seen=new Set(),records=[];
-  let scrollId="",hasNext=true,pages=0;
-  while(hasNext&&pages<10){
-   const scrollArg=scrollId?", scrollId: "+JSON.stringify(scrollId):"";
-   const query="{ conversionReport(purchaseTimeStart: "+start+", purchaseTimeEnd: "+end+scrollArg+", limit: 100) { nodes { conversionId totalCommission orders { orderId orderStatus } } pageInfo { hasNextPage scrollId } } }";
-   const data=await shopeeRequest(query);
-   const report=data?.conversionReport||{};
-   for(const n of report.nodes||[]){
-    const id=String(n.conversionId||"");
-    if(!id||seen.has(id))continue;
-    seen.add(id);
-    records.push({id,commission:Number(n.totalCommission)||0,statuses:(n.orders||[]).map(o=>o.orderStatus)});
-   }
-   hasNext=Boolean(report.pageInfo?.hasNextPage);
-   const next=String(report.pageInfo?.scrollId||"");
-   if(!next||next===scrollId)hasNext=false;
-   scrollId=next;pages++;
-  }
-  const total=records.reduce((n,r)=>n+r.commission,0);
-  res.json({platform:"Shopee",periodDays:days,conversions:records.length,reportedCommission:Math.round(total*100)/100,currency:"BRL",partial:hasNext,source:"Shopee Affiliate conversionReport",note:"Comissão informada pela API, incluindo possíveis pedidos pendentes ou cancelados. Não representa necessariamente comissão aprovada, recebida ou lucro líquido.",updatedAt:new Date().toISOString()});
- }catch(e){res.status(e.status||502).json({error:e.message||"Falha ao consultar comissões Shopee."})}
-});
-app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
-  try {
-    const start = Number(req.query.start);
-    const end = Number(req.query.end);
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start <= 0 || end <= start ||
-      end - start > 31 * 86400) {
-      return res.status(400).json({ error: "Informe start e end como Unix timestamp (segundos), em intervalo máximo de 31 dias." });
-    }
-    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 50));
-    const scrollId = String(req.query.scrollId || "").slice(0, 500);
-    const scrollArg = scrollId ? ", scrollId: " + JSON.stringify(scrollId) : "";
-    const query = "{ conversionReport(purchaseTimeStart: " + start +
-      ", purchaseTimeEnd: " + end + scrollArg + ", limit: " + limit +
-      ") { nodes { purchaseTime clickTime conversionId totalCommission sellerCommission " +
-      "shopeeCommissionCapped buyerType device utmContent orders { orderId orderStatus " +
-      "items { itemId itemName shopName itemPrice qty itemTotalCommission attributionType } } } " +
-      "pageInfo { limit hasNextPage scrollId } } }";
-    const data = await shopeeRequest(query);
-    res.json(data?.conversionReport || { nodes: [], pageInfo: {} });
-  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
-});
+
+
 
 
 
