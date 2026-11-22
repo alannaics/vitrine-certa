@@ -6,7 +6,7 @@ const TYPES = new Set(["sale","expense"]);
 const MAX_AMOUNT = 100000000;
 function validate(input) {
   if (!input || !TYPES.has(input.type)) throw new Error("Tipo inválido.");
-  const amount = Number(input.amount);
+  const amount = typeof input.amount === "number" ? input.amount : NaN;
   if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) throw new Error("Valor inválido.");
   const date = String(input.date || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00Z"))) throw new Error("Data inválida.");
@@ -33,7 +33,7 @@ function registerFinance(app,db,auth){
   router.use((req,res,next)=>{if(!db)return res.status(503).json({error:"Banco não configurado."});next();});
   router.get("/entries",async(req,res)=>{
     try {
-      const result=await db.query("SELECT id,type,amount_cents,entry_date::text,product,channel,notes,created_at FROM finance_entries ORDER BY entry_date DESC,created_at DESC LIMIT 3000");
+      const result=await db.query("SELECT id,type,amount_cents,entry_date::text,product,channel,notes,created_at FROM finance_entries ORDER BY entry_date DESC,created_at DESC LIMIT 10000");
       res.json({entries:result.rows,summary:summary(result.rows)});
     }catch(e){console.error("[finance GET]",e.message);res.status(500).json({error:"Falha ao consultar registros."});}
   });
