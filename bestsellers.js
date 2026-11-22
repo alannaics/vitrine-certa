@@ -54,11 +54,16 @@ function registerBestsellers(app, authenticate, ensureToken) {
         if (!Object.hasOwn(endpoints, type) || !/^MLBU?\d+$/.test(id) || !Number.isInteger(position)) return null;
         const item = await get("/" + endpoints[type] + "/" + id, token).catch(() => ({}));
         const picture = item.pictures?.[0];
+        const winner = item.buy_box_winner;
+        const listingId = type === "ITEM" && /^MLB\d+$/.test(id) ? id : winner?.item_id;
+        const sale = /^MLB\d+$/.test(listingId)
+          ? await get("/items/" + listingId + "/sale_price?context=channel_marketplace", token).catch(() => null)
+          : null;
         return {
           id, position, title: item.title || item.name || null,
           image: picture?.secure_url || picture?.url || item.secure_thumbnail || null,
-          price: item.price ?? item.buy_box_winner?.price ?? null,
-          url: item.permalink || null
+          price: (sale?.currency_id === "BRL" ? sale.amount : null) ?? item.price ?? winner?.price ?? null,
+          url: item.permalink || (type === "PRODUCT" ? "https://www.mercadolivre.com.br/p/" + id : null)
         };
       }));
       res.json({ products: products.filter(Boolean).sort((a, b) => a.position - b.position) });
