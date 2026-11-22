@@ -5,7 +5,9 @@
   "description": "Vitrine Certa affiliate dashboard API",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test",
+    "check": "node --check server.js && node --check finance.js && npm test"
   },
   "engines": {
     "node": ">=20"
