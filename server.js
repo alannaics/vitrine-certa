@@ -9,6 +9,7 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "studio-home.html")));
 app.get("/classic", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.get("/tools", (_req, res) => res.sendFile(path.join(__dirname, "tools.html")));
 app.get("/finance", (_req, res) => res.sendFile(path.join(__dirname, "finance.html")));
 app.get("/catalog", (_req, res) => res.sendFile(path.join(__dirname, "catalog.html")));
 
