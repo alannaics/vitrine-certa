@@ -8,12 +8,32 @@
 @media(max-width:800px){.layout{display:block}.sidebar{position:relative;height:auto;padding:16px;gap:14px}.logo{padding:0 5px}.nav-label,.side-bottom{display:none}.nav{display:flex;overflow-x:auto;gap:6px;scrollbar-width:none}.nav a{white-space:nowrap;flex:0 0 auto;padding:10px 12px;font-size:12px}.nav::-webkit-scrollbar{display:none}.main{padding:20px 16px 40px}.topbar{margin-bottom:23px}.hero{padding:27px 24px;min-height:0}.hero h2{font-size:27px}}
 @media(max-width:550px){.main{padding:18px 12px 32px}.topbar{margin-bottom:20px}.date{display:none}.heading h1{font-size:28px}.hero{border-radius:18px;padding:26px 20px}.hero h2{font-size:24px}.hero-actions .btn{flex:1}.metrics{gap:9px}.metric{padding:15px;border-radius:14px}.metric-value{font-size:20px}.metric-icon{width:29px;height:29px}.metric-label{font-size:10px}.panel{padding:19px}.search{flex-wrap:wrap}.search input,.search .btn{width:100%;flex:1 1 100%}.feature-grid{grid-template-columns:1fr}.footer{flex-wrap:wrap}.section-head{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}
+</style><style>
+/* Workspace: one navigation, one content surface, fewer competing elements */
+.hero-art,.feature-grid,.footer,.side-bottom,.quick-tags{display:none!important}
+.hero{min-height:0!important;padding:26px 32px!important;margin-bottom:18px!important}
+.hero h2{font-size:clamp(21px,2.2vw,29px)!important;margin:10px 0!important}
+.hero p{margin-bottom:15px!important}
+.hero:before{opacity:.45}
+.heading{margin-bottom:18px!important}
+.heading h1{font-size:clamp(26px,2.6vw,34px)!important}
+.metrics{gap:11px!important}.metric{padding:17px!important}
+.section-head{margin:20px 0 12px!important}
+.lower{margin-top:17px!important}
+#vcModule{display:none;min-width:0}
+#vcModule.active{display:block}
+#vcModuleTitle{font:800 clamp(25px,3vw,36px)/1.2 Manrope;letter-spacing:-1.3px;margin:0 0 7px}
+#vcModuleSubtitle{color:#818ba1;font-size:13px;margin:0 0 20px;line-height:1.6}
+#vcModuleFrame{width:100%;border:0;background:transparent;display:block;min-height:850px}
+#vcOverview.hidden{display:none}
+.nav a.active{background:#2b2b60!important;color:white!important;box-shadow:inset 3px 0 #a89eff!important}
+@media(max-width:550px){.hero{padding:21px!important}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}#vcModuleFrame{min-height:1100px}}
 </style></head><body>
 <div class="layout"><aside class="sidebar"><a href="/" class="logo" aria-label="Vitrine Certa, início"><div class="logo-mark">V</div><div><strong>vitrine certa<span style="color:#a79bff">.</span></strong><small>Affiliate workspace</small></div></a>
 <div><div class="nav-label">Seu workspace</div><nav class="nav" aria-label="Menu principal"><a href="/" class="active"><span class="ico">◫</span> Visão geral</a><a href="/catalog"><span class="ico">▦</span> Explorar produtos</a><a href="/finance"><span class="ico">◈</span> Financeiro</a><a href="/tools"><span class="ico">✧</span> Ferramentas</a></nav></div>
 <div class="side-bottom"><p>Um espaço para transformar oportunidades em decisões mais inteligentes.</p><a href="/tools">Acessar ferramentas anteriores ↗</a></div></aside>
 <main class="main"><div class="topbar"><div class="breadcrumb">Workspace <span style="margin:0 9px;color:#c4cad7">/</span> <strong>Visão geral</strong></div><div class="top-right"><span class="date" id="today"></span><div class="avatar" aria-hidden="true">VC</div></div></div>
-<div class="heading"><div class="eyebrow">Bem-vinda ao seu espaço</div><h1>Seu negócio, em perspectiva.</h1><p>Uma visão clara para descobrir oportunidades e acompanhar a evolução da Vitrine Certa.</p></div>
+<div id="vcOverview"><div class="heading"><div class="eyebrow">Bem-vinda ao seu espaço</div><h1>Seu negócio, em perspectiva.</h1><p>Uma visão clara para descobrir oportunidades e acompanhar a evolução da Vitrine Certa.</p></div>
 <section class="hero"><div class="hero-copy"><div class="hero-tag">✦ Sua central de oportunidades</div><h2>As melhores ideias começam com uma boa visão.</h2><p>Explore produtos, organize suas ações e acompanhe o que realmente importa. Tudo no mesmo lugar, com mais clareza e menos distrações.</p><div class="hero-actions"><a class="btn light" href="/catalog">Explorar produtos <span>↗</span></a><a class="btn ghost" href="/tools">Ferramentas de criação →</a></div></div><div class="hero-art" aria-hidden="true"><div class="art-card art-a"><div class="art-line"></div><div class="art-line short"></div><span class="art-bar" style="height:23px"></span><span class="art-bar" style="height:39px"></span><span class="art-bar" style="height:31px"></span><span class="art-bar" style="height:51px"></span></div><div class="art-card art-b"><div class="art-line short"></div><div style="font:800 25px Manrope;margin:12px 0 3px">VC Studio</div><div style="font-size:10px;color:#d7d0ff">Painel de oportunidades</div></div></div></section>
 <div class="section-head"><div><h3>Visão dos resultados</h3><p>Os números aparecem apenas quando houver dados disponíveis.</p></div><a href="/finance">Ver financeiro ↗</a></div>
 <section class="metrics" aria-label="Indicadores"><div class="metric"><div class="metric-top"><span class="metric-label">Comissões recebidas</span><span class="metric-icon">↗</span></div><div class="metric-value" id="mSales">—</div><div class="metric-note">Lançamentos confirmados no financeiro</div></div><div class="metric"><div class="metric-top"><span class="metric-label">Resultado líquido parcial</span><span class="metric-icon">◈</span></div><div class="metric-value" id="mProfit">—</div><div class="metric-note">Receitas registradas menos despesas</div></div><div class="metric"><div class="metric-top"><span class="metric-label">Despesas registradas</span><span class="metric-icon">▤</span></div><div class="metric-value" id="mExpenses">—</div><div class="metric-note">Custos registrados no financeiro</div></div><div class="metric"><div class="metric-top"><span class="metric-label">ROI registrado</span><span class="metric-icon">◎</span></div><div class="metric-value" id="mRoi">—</div><div class="metric-note">Disponível com dados suficientes</div></div></section>
@@ -21,7 +41,7 @@
 <section class="panel"><h3>Status das integrações</h3><p class="panel-sub">Transparência sobre as conexões disponíveis.</p><div class="status-list"><div class="status-row"><div class="status-name"><span class="status-icon">◈</span> Banco de dados</div><span id="sDb" class="status-pill">Verificando</span></div><div class="status-row"><div class="status-name"><span class="status-icon">▦</span> Mercado Livre</div><span id="sMl" class="status-pill">Verificando</span></div><div class="status-row"><div class="status-name"><span class="status-icon">✧</span> Shopee</div><span id="sShopee" class="status-pill">Verificando</span></div></div><div id="statusNotice" class="notice" role="status"></div></section></div>
 <div class="section-head"><div><h3>Seu espaço de trabalho</h3><p>Acesse o que precisa sem se perder em menus.</p></div></div>
 <section class="feature-grid"><a class="feature" href="/catalog"><div class="feature-icon">▦</div><strong>Descoberta de produtos</strong><span>Explore anúncios, compare preços e organize suas próximas pesquisas.</span><em>Explorar catálogo →</em></a><a class="feature" href="/finance"><div class="feature-icon">◈</div><strong>Central financeira</strong><span>Acompanhe os valores registrados e os relatórios disponíveis em um só painel.</span><em>Ver resultados →</em></a><a class="feature" href="/tools"><div class="feature-icon">✧</div><strong>Estúdio de conteúdo</strong><span>Acesse planejamento, campanhas, textos e as ferramentas que você já utiliza.</span><em>Abrir ferramentas →</em></a></section>
-<footer class="footer"><span>© Vitrine Certa · Seu espaço de crescimento</span><span><span class="live-dot"></span> Dados reais, sem números simulados</span></footer></main></div>
+<footer class="footer"><span>© Vitrine Certa · Seu espaço de crescimento</span><span><span class="live-dot"></span> Dados reais, sem números simulados</span></footer></div><section id="vcModule" aria-live="polite"><h1 id="vcModuleTitle"></h1><p id="vcModuleSubtitle"></p><iframe id="vcModuleFrame" title="Área de trabalho" loading="eager"></iframe></section></main></div>
 <script>
 const $=id=>document.getElementById(id);
 $("today").textContent=new Intl.DateTimeFormat("pt-BR",{day:"numeric",month:"long",year:"numeric"}).format(new Date());
@@ -32,4 +52,37 @@ function pill(id,text,state){const e=$(id);e.textContent=text;e.className="statu
 async function loadStatus(){try{const r=await fetch("/api/status",{cache:"no-store"});if(!r.ok)throw Error();const d=await r.json();pill("sDb",d.database?.configured?"Configurado":"Não configurado",d.database?.configured?"good":"warn");pill("sMl",d.mercadoLivre?.connected?"Autorização salva":d.mercadoLivre?.configured?"Requer conexão":"Não configurado",d.mercadoLivre?.connected?"good":"warn");pill("sShopee",d.shopee?.configured?"Configurada":"Não configurada",d.shopee?.configured?"good":"warn");if(d.mercadoLivre?.connected){$("statusNotice").textContent="A autorização do Mercado Livre está armazenada, mas isso não garante que a renovação esteja válida."; $("statusNotice").classList.add("show")}}catch{["sDb","sMl","sShopee"].forEach(id=>pill(id,"Indisponível","warn"))}}
 async function loadMetrics(){const token=sessionStorage.getItem("vcDashboardToken");if(!token)return;try{const r=await fetch("/api/finance/entries",{headers:{"x-dashboard-token":token}});if(!r.ok)return;const d=await r.json();const entries=d.entries||[];let sales=0,expenses=0;for(const x of entries){const n=Number(x.amount_cents)||0;if(x.type==="sale")sales+=n;else if(x.type==="expense")expenses+=n}const profit=sales-expenses;$("mSales").textContent=money(sales/100);$("mExpenses").textContent=money(expenses/100);$("mProfit").textContent=money(profit/100);$("mRoi").textContent=expenses?((profit/expenses)*100).toFixed(1)+"%":"—"}catch{}}
 loadStatus();loadMetrics();
+</script><script>
+(function(){
+const moduleMeta={
+catalog:{title:"Explorar produtos",subtitle:"Pesquise, compare e descubra oportunidades.",url:"/catalog?embedded=1"},
+finance:{title:"Financeiro",subtitle:"Comissões e despesas com informações verificáveis.",url:"/finance?embedded=1"},
+tools:{title:"Estúdio de ferramentas",subtitle:"Inteligência, planejamento e conteúdos em um único espaço.",url:"/classic?embedded=1"}
+};
+const frame=document.getElementById("vcModuleFrame"),module=document.getElementById("vcModule"),overview=document.getElementById("vcOverview");
+const nav=document.querySelector(".nav"),crumb=document.querySelector(".breadcrumb strong");
+function go(section,query="",push=true){
+const meta=moduleMeta[section];
+overview.classList.toggle("hidden",!!meta);module.classList.toggle("active",!!meta);
+document.querySelectorAll(".nav a").forEach(a=>{const active=(section==="home"&&a.getAttribute("href")==="/")||(a.getAttribute("href")==="/"+section);a.classList.toggle("active",active);if(active)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+if(!meta){crumb.textContent="Visão geral";if(push)history.pushState({section:"home"},"","/");window.scrollTo({top:0,behavior:"instant"});return}
+document.getElementById("vcModuleTitle").textContent=meta.title;document.getElementById("vcModuleSubtitle").textContent=meta.subtitle;crumb.textContent=meta.title;
+const url=meta.url+(query?"&q="+encodeURIComponent(query):"");
+if(frame.getAttribute("src")!==url)frame.src=url;
+if(push)history.pushState({section},"","/"+section+(query?"?q="+encodeURIComponent(query):""));
+window.scrollTo({top:0,behavior:"instant"});
+}
+document.addEventListener("click",e=>{
+const a=e.target.closest("a[href]");if(!a||a.target==="_blank"||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
+const url=new URL(a.href,location.origin);if(url.origin!==location.origin)return;
+const section=url.pathname==="/"?"home":url.pathname.slice(1);
+if(section==="home"||moduleMeta[section]){e.preventDefault();go(section,url.searchParams.get("q")||"")}
+});
+const originalForm=document.getElementById("searchForm");originalForm.addEventListener("submit",e=>{e.preventDefault();const q=document.getElementById("searchTerm").value.trim();if(q)go("catalog",q)});
+document.querySelectorAll("[data-term]").forEach(b=>b.addEventListener("click",e=>{e.stopImmediatePropagation();go("catalog",b.dataset.term)},true));
+window.addEventListener("popstate",()=>{const section=location.pathname.slice(1)||"home";go(moduleMeta[section]?section:"home",new URLSearchParams(location.search).get("q")||"",false)});
+window.addEventListener("message",e=>{if(e.origin!==location.origin||e.source!==frame.contentWindow||e.data?.type!=="vc-tools-height")return;const h=Number(e.data.height);if(Number.isFinite(h)&&h>=400&&h<=30000)frame.style.height=h+"px"});
+frame.addEventListener("load",()=>{try{const doc=frame.contentDocument;const update=()=>{const h=Math.max(doc.body.scrollHeight,doc.documentElement.scrollHeight);if(h>300&&h<30000)frame.style.height=(h+25)+"px"};update();new ResizeObserver(update).observe(doc.body)}catch{}});
+const section=location.pathname.slice(1);if(moduleMeta[section])go(section,new URLSearchParams(location.search).get("q")||"",false);
+})();
 </script></body></html>
