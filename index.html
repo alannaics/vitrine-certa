@@ -783,7 +783,7 @@ if(!document.body.classList.contains("vc-embedded")){
  const side=document.querySelector(".side"),main=document.querySelector(".main"),tabs=document.getElementById("nav");
  const brand=document.createElement("a");brand.href="/";brand.className="vc-brand";brand.innerHTML='<span class="vc-brandmark">V</span><span><strong>vitrine certa<span style="color:#a79bff">.</span></strong><small>Affiliate workspace</small></span>';
  const nav=document.createElement("nav");nav.className="vc-nav";nav.setAttribute("aria-label","Navegação principal");
- for(const [href,icon,name] of [["/","◫","Visão geral"],["/catalog","▦","Explorar produtos"],["/finance","◈","Financeiro"],["/tools","✧","Ferramentas"]]){const a=document.createElement("a");a.href=href;if(href==="/tools"){a.className="active";a.setAttribute("aria-current","page")}const ico=document.createElement("span");ico.className="vc-ico";ico.textContent=icon;a.append(ico,document.createTextNode(name));nav.append(a)}
+ for(const [href,icon,name] of [["/","◫","Visão geral"],["/catalog","▦","Explorar produtos"],["/finance","◈","Financeiro"],["/tools","✧","Ferramentas"],["/settings","⚙","Configurações"]]){const a=document.createElement("a");a.href=href;if(href==="/tools"){a.className="active";a.setAttribute("aria-current","page")}const ico=document.createElement("span");ico.className="vc-ico";ico.textContent=icon;a.append(ico,document.createTextNode(name));nav.append(a)}
  const group=document.createElement("div");const caption=document.createElement("div");caption.className="vc-caption";caption.textContent="Seu workspace";group.append(caption,nav);
  const foot=document.createElement("div");foot.className="vc-sidebar-foot";foot.textContent="Seu espaço para descobrir, organizar e crescer.";
  side.prepend(group);side.prepend(brand);side.append(foot);
@@ -792,4 +792,9 @@ if(!document.body.classList.contains("vc-embedded")){
  main.prepend(top);main.querySelector(".top").after(tabs);
  const query=new URLSearchParams(location.search).get("page");if(query&&tabs.querySelector('[data-page="'+CSS.escape(query)+'"]'))showPage(query);
 }
+</script><script>
+(function(){
+ const section=new URLSearchParams(location.search).get("page");
+ if(section&&document.querySelector('#nav button[data-page="'+section.replace(/[^a-z]/g,"")+'"]'))showPage(section);
+})();
 </script></body></html>
