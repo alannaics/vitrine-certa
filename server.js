@@ -265,6 +265,45 @@ app.get("/api/shopee/products", requireDashboardToken, async (req, res) => {
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
+// Public affiliate storefront: only offers supplied with attribution links by the official partner API.
+const publicOfferCache = new Map();
+const PUBLIC_CATEGORIES = Object.freeze({
+  tecnologia: "fone bluetooth", casa: "organizadores casa", beleza: "skincare",
+  moda: "moda feminina", fitness: "acessorios fitness"
+});
+app.get("/api/v2/offers", async (req, res) => {
+  const category = String(req.query.category || "tecnologia");
+  if (!Object.hasOwn(PUBLIC_CATEGORIES, category)) return res.status(400).json({ error: "Categoria inválida." });
+  res.set("Cache-Control", "public, max-age=120");
+  if (!APP_ID || !APP_SECRET) return res.json({ configured: false, source: "shopee_affiliate", offers: [], reason: "Conecte as credenciais oficiais da API de afiliados Shopee." });
+  const cached = publicOfferCache.get(category);
+  if (cached && Date.now() - cached.time < 15 * 60 * 1000) return res.json({ ...cached.payload, cached: true });
+  try {
+    const query = "{ productOfferV2(keyword: " + JSON.stringify(PUBLIC_CATEGORIES[category]) +
+      ", listType: 0, sortType: 1, page: 1, limit: 30) { nodes { itemId productName productLink offerLink imageUrl priceMin priceMax priceDiscountRate sales ratingStar commissionRate shopName } } }";
+    const data = await shopeeRequest(query);
+    const offers = (data?.productOfferV2?.nodes || []).filter(p => {
+      try {
+        const url = new URL(p.offerLink);
+        const host = url.hostname.toLowerCase();
+        return url.protocol === "https:" && (host === "shopee.com.br" || host.endsWith(".shopee.com.br") || host === "shope.ee" || host === "s.shopee.com.br") &&
+          /^https:\/\//.test(String(p.imageUrl || "")) && Number(p.priceMin) > 0 && p.productName;
+      } catch { return false; }
+    }).slice(0, 24).map(p => ({
+      id: String(p.itemId), title: String(p.productName).slice(0, 180),
+      image: p.imageUrl, price: Number(p.priceMin), url: p.offerLink,
+      shop: String(p.shopName || ""), sales: Number(p.sales) || null,
+      commissionRate: Number(p.commissionRate) || null
+    }));
+    const payload = { configured: true, source: "shopee_affiliate", category, offers, affiliateDisclosure: "Podemos receber comissão por compras realizadas através dos links.", stockVerified: false, updatedAt: new Date().toISOString() };
+    publicOfferCache.set(category, { time: Date.now(), payload });
+    return res.json(payload);
+  } catch (error) {
+    console.error("[V2 affiliate feed]", error.message);
+    return res.status(502).json({ error: "A fonte de ofertas está temporariamente indisponível.", source: "shopee_affiliate", offers: [] });
+  }
+});
+
 const mlDiscoveryCache = new Map();
 app.get("/api/mercadolivre/products", async (req, res) => {
   try {
