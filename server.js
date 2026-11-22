@@ -135,6 +135,7 @@ async function loadMlTokens() {
 async function initializeDatabase() {
   if (!db) return;
   await initializeFinance(db);
+  await db.query("CREATE TABLE IF NOT EXISTS affiliate_offers (id BIGSERIAL PRIMARY KEY,title TEXT NOT NULL,price NUMERIC(12,2) NOT NULL,image_url TEXT,affiliate_url TEXT NOT NULL,category TEXT NOT NULL DEFAULT 'geral',published BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS app_secrets (secret_name TEXT PRIMARY KEY, secret_value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS dashboard_state (id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1), state JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS saved_campaigns (id TEXT PRIMARY KEY, product_name TEXT NOT NULL, format TEXT, content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
@@ -266,6 +267,35 @@ app.get("/api/shopee/products", requireDashboardToken, async (req, res) => {
 });
 
 // Public affiliate storefront: only offers supplied with attribution links by the official partner API.
+
+app.get("/api/v2/manual-offers", async (_req,res) => {
+ if(!db)return res.json({offers:[],configured:false});
+ try{const q=await db.query("SELECT id,title,price,image_url,affiliate_url,category,created_at FROM affiliate_offers WHERE published=TRUE ORDER BY created_at DESC LIMIT 100");res.json({offers:q.rows,configured:true});}
+ catch(e){res.status(503).json({error:"Catálogo indisponível."});}
+});
+app.get("/api/v2/manual-offers/manage",requireDashboardToken,async(_req,res)=>{
+ if(!db)return res.status(503).json({error:"Banco não configurado."});
+ try{const q=await db.query("SELECT * FROM affiliate_offers ORDER BY created_at DESC LIMIT 200");res.json({offers:q.rows});}
+ catch{res.status(503).json({error:"Catálogo indisponível."});}
+});
+app.post("/api/v2/manual-offers",requireDashboardToken,async(req,res)=>{
+ if(!db)return res.status(503).json({error:"Banco não configurado."});
+ const title=String(req.body?.title||"").trim().slice(0,180);
+ const price=Number(req.body?.price);
+ const category=String(req.body?.category||"geral").slice(0,40);
+ const image=String(req.body?.image||"").trim();
+ const link=String(req.body?.affiliateUrl||"").trim();
+ const validUrl=value=>{try{const u=new URL(value);return u.protocol==="https:"&&!u.username&&!u.password&&!["localhost","127.0.0.1","::1"].includes(u.hostname)&&!u.hostname.endsWith(".local");}catch{return false;}};
+ if(!title||!Number.isFinite(price)||price<=0||price>1000000||!validUrl(link)||(image&&!validUrl(image)))return res.status(400).json({error:"Título, preço e URL HTTPS válida são obrigatórios."});
+ try{const q=await db.query("INSERT INTO affiliate_offers(title,price,image_url,affiliate_url,category,published) VALUES($1,$2,$3,$4,$5,$6) RETURNING id",[title,price,image||null,link,category,req.body?.published===true]);res.status(201).json({id:q.rows[0].id});}
+ catch{res.status(500).json({error:"Falha ao salvar."});}
+});
+app.delete("/api/v2/manual-offers/:id",requireDashboardToken,async(req,res)=>{
+ if(!db)return res.status(503).json({error:"Banco não configurado."});
+ if(!/^\d+$/.test(req.params.id))return res.status(400).json({error:"ID inválido."});
+ try{const q=await db.query("DELETE FROM affiliate_offers WHERE id=$1 RETURNING id",[req.params.id]);res.status(q.rowCount?200:404).json({deleted:!!q.rowCount});}
+ catch{res.status(500).json({error:"Falha ao excluir."});}
+});
 const publicOfferCache = new Map();
 const PUBLIC_CATEGORIES = Object.freeze({
   tecnologia: "fone bluetooth", casa: "organizadores casa", beleza: "skincare",
