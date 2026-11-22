@@ -4,11 +4,12 @@ const path = require("node:path");
 const { Pool } = require("pg");
 const { registerFinance, initializeFinance } = require("./finance");
 const { registerCatalog } = require("./catalog");
+const { registerBestsellers } = require("./bestsellers");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 // Public assets are explicitly allowlisted; secrets and server source are never exposed.
-const publicAssets = new Set(["studio.css", "studio-pages.css", "studio-shell.css", "studio-shell.js", "catalog-tools.js"]);
+const publicAssets = new Set(["studio.css", "studio-pages.css", "studio-shell.css", "studio-shell.js", "catalog-tools.js", "affiliate-workspace.js"]);
 app.get("/:asset", (req, res, next) => {
   if (!publicAssets.has(req.params.asset)) return next();
   res.set("Cache-Control", "public, max-age=300");
@@ -273,6 +274,7 @@ app.delete("/api/v2/manual-offers/:id",requireDashboardToken,async(req,res)=>{
  catch{res.status(500).json({error:"Falha ao excluir."});}
 });
 const mlDiscoveryCache = new Map();
+registerBestsellers(app, requireDashboardToken, ensureMlToken);
 app.get("/api/mercadolivre/products", async (req, res) => {
   try {
     const query = String(req.query.q || "").trim().slice(0, 100);
@@ -651,7 +653,8 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
       "Link de afiliado fornecido: " + (link || "não informado"),
       "Informações adicionais fornecidas pelo usuário: " + (details || "nenhuma")
     ].join("\n");
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent";
+    const model = "gemini-3.1-flash-lite";
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
     const requestBody = JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 5000, thinkingConfig: { thinkingLevel: "low" } }
@@ -685,9 +688,9 @@ app.post("/api/gemini/generate", requireDashboardToken, async (req, res) => {
       const message = data.error?.message || "Falha ao gerar conteúdo no Gemini.";
       return res.status(502).json({ error: message });
     }
-    const text = (data.candidates || []).flatMap(c => c.content?.parts || []).map(p => p.text || "").join("\n").trim();
+    const text = (data.candidates || []).flatMap(c => c.content?.parts || []).filter(p => !p.thought).map(p => p.text || "").join("\n").trim();
     if (!text) return res.status(502).json({ error: "O Gemini não retornou texto. Tente novamente." });
-    res.json({ text, model: "gemini-3.1-flash-lite-preview" });
+    res.json({ text, model });
   } catch (e) { console.error("Gemini generation failed:", e); res.status(502).json({ error: "Falha na comunicação com o serviço de IA: " + (e.message || "erro desconhecido") }); }
 });
 
