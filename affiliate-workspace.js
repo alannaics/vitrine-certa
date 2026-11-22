@@ -243,6 +243,24 @@ async function loadCommissions() {
   }
 }
 
+$("toggleDemo").onclick = () => {
+  const panel = $("demoResults");
+  panel.hidden = !panel.hidden;
+  $("toggleDemo").setAttribute("aria-expanded", String(!panel.hidden));
+  $("toggleDemo").textContent = panel.hidden ? "Ver exemplo" : "Ocultar exemplo";
+};
+
+renderBars("demoSalesChart", [
+  { label: "Fone Bluetooth", value: 9 },
+  { label: "Organizador de gaveta", value: 6 },
+  { label: "Luminária de mesa", value: 3 }
+], String, "");
+renderBars("demoCommissionChart", [
+  { label: "Segunda-feira", value: 28 },
+  { label: "Terça-feira", value: 42 },
+  { label: "Quarta-feira", value: 56 }
+], currency, "");
+
 if (authToken) {
   $("token").value = authToken;
   loadAdmin();
