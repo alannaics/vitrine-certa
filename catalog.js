@@ -24,7 +24,7 @@ function registerCatalog(app,ensureToken){
    if(!response.ok)return res.status(response.status===401||response.status===403?response.status:502).json({error:authIssue?"A conexão Mercado Livre precisa ser corrigida: "+authIssue+"; a busca pública também foi recusada (HTTP "+response.status+").":"A API do Mercado Livre recusou a busca (HTTP "+response.status+").",upstreamStatus:response.status});
    const products=(Array.isArray(data.results)?data.results:[]).map(p=>({
     id:String(p.id||""),title:String(p.title||""),price:Number.isFinite(Number(p.price))?Number(p.price):null,
-    thumbnail:String(p.thumbnail||""),permalink:String(p.permalink||""),
+    thumbnail:String(p.secure_thumbnail||p.thumbnail||p.pictures?.[0]?.secure_url||p.pictures?.[0]?.url||"").replace(/^http:\\/\\//,"https://"),permalink:String(p.permalink||""),
     soldQuantity:p.sold_quantity==null?null:Number(p.sold_quantity),
     availableQuantity:p.available_quantity==null?null:Number(p.available_quantity),
     freeShipping:Boolean(p.shipping?.free_shipping),category:String(p.category_id||""),
