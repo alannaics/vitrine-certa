@@ -68,7 +68,7 @@ function secureMarketplaceUrl(value) {
   return "";
 }
 
-function rankingCard(product) {
+function rankingCard(product, category) {
   const card = document.createElement("article");
   card.className = "offer";
   const imageUrl = secureMarketplaceUrl(product.image?.replace(/^http:/, "https:"));
@@ -116,10 +116,12 @@ function rankingCard(product) {
     create.type = "button";
     create.textContent = "Criar conteúdo";
     create.onclick = () => {
-      selectedProduct = product;
+      selectedProduct = { ...product, category };
       $("creativeProduct").value = product.title;
       $("creativePrice").value = product.price ?? "";
       $("creativeLink").value = savedLink(product.id);
+      $("creativeImage").value = imageUrl;
+      $("openSavedDrafts").hidden = true;
       $("creativeOutput").hidden = true;
       $("creativeStatus").textContent = "";
       tab("creative");
@@ -156,7 +158,7 @@ async function loadRanking() {
     rankingStatus.textContent = products.length
       ? selection.selectedOptions[0].text + " · " + products.length + " posições"
       : "O Mercado Livre não retornou um ranking para esta categoria. Consulte uma subcategoria, se houver.";
-    rankingCards.append(...products.map(rankingCard));
+    rankingCards.append(...products.map(product => rankingCard(product, selection.selectedOptions[0].text)));
   } catch (error) {
     if (current === rankingVersion) rankingStatus.textContent = error.message;
   }
@@ -169,6 +171,8 @@ categoryPath.onchange = ({ target }) => {
 $("rankingRefresh").onclick = loadRanking;
 $("rankingAccess").onclick = () => tab("settings");
 $("creativeAccess").onclick = () => tab("settings");
+
+$("openSavedDrafts").onclick = () => $("manageDrafts").click();
 
 $("creativeSaveDraft").onclick = async () => {
   const form = $("creativeForm");
@@ -189,18 +193,17 @@ $("creativeSaveDraft").onclick = async () => {
   status.textContent = "Salvando rascunho…";
   try {
     const product = selectedProduct;
-    const category = [...categoryPath.querySelectorAll("select")].findLast(select => select.value)?.selectedOptions[0].text;
     const result = await request("/api/v2/affiliate-links/import", {
       method: "POST",
       body: JSON.stringify({ offers: [{
         title: data.product, price: Number(data.price), affiliateUrl: link,
-        image: secureMarketplaceUrl(product?.image?.replace(/^http:/, "https:")),
-        category: product ? category : undefined
+        image: data.image.trim(), category: product?.category
       }] })
     });
     if (product) {
       try { localStorage.setItem("vcAffiliateLink:" + product.id, link); } catch {}
     }
+    $("openSavedDrafts").hidden = false;
     status.textContent = result.created
       ? "Rascunho salvo. Revise e publique em Ofertas → Gerenciar rascunhos."
       : "Esse link já está cadastrado. Confira em Ofertas → Gerenciar rascunhos.";

@@ -187,23 +187,27 @@ app.get("/api/status", (_req, res) => {
 
 // Track outbound traffic without cookies, IP addresses, or personal identifiers.
 app.get("/go/:id", async(req,res)=>{
+ res.set("Cache-Control","no-store");
  if(!db || !/^\d+$/.test(req.params.id))return res.status(404).send("Oferta indisponível.");
  try{
   const q=await db.query("SELECT affiliate_url FROM affiliate_offers WHERE id=$1 AND published=TRUE",[req.params.id]);
   if(!q.rowCount)return res.status(404).send("Oferta indisponível.");
   const target=new URL(q.rows[0].affiliate_url);
   if(target.protocol!=="https:"||target.username||target.password||!target.hostname||target.hostname==="localhost"||target.hostname.endsWith(".local"))return res.status(400).send("Destino inválido.");
-  db.query("INSERT INTO affiliate_clicks(offer_id) VALUES($1)",[req.params.id]).catch(e=>console.error("[click tracking]",e.message));
-  res.set("Cache-Control","no-store");
+  if(req.method==="GET"){
+   try{await db.query("INSERT INTO affiliate_clicks(offer_id) VALUES($1)",[req.params.id]);}
+   catch(e){console.error("[click tracking]",e.message);}
+  }
   return res.redirect(302,target.toString());
  }catch{return res.status(503).send("Oferta temporariamente indisponível.");}
 });
 app.get("/api/v2/clicks",requireDashboardToken,async(_req,res)=>{
  if(!db)return res.status(503).json({error:"Banco não configurado."});
  try{
-  const q=await db.query("SELECT o.id,o.title,COUNT(c.id)::int AS clicks FROM affiliate_offers o LEFT JOIN affiliate_clicks c ON c.offer_id=o.id GROUP BY o.id,o.title ORDER BY clicks DESC LIMIT 100");
-  const total=q.rows.reduce((n,r)=>n+r.clicks,0);
-  res.json({totalClicks:total,offers:q.rows,notice:"Cliques não representam vendas nem comissões."});
+  const q=await db.query("SELECT o.id,o.title,COUNT(c.id)::int AS clicks,SUM(COUNT(c.id)) OVER () AS total_clicks FROM affiliate_offers o LEFT JOIN affiliate_clicks c ON c.offer_id=o.id GROUP BY o.id,o.title ORDER BY clicks DESC LIMIT 100");
+  const total=Number(q.rows[0]?.total_clicks||0);
+  const offers=q.rows.map(({total_clicks,...offer})=>offer);
+  res.json({totalClicks:total,offers,notice:"Cliques não representam vendas nem comissões."});
  }catch{res.status(503).json({error:"Relatório indisponível."});}
 });
 app.get("/api/v2/manual-offers", async (_req,res) => {
@@ -223,22 +227,25 @@ app.post("/api/v2/affiliate-links/import",requireDashboardToken,async(req,res)=>
  const normalized=[];
  for(let i=0;i<rows.length;i++){
   const row=rows[i]||{},title=String(row.title||"").trim().slice(0,180),price=Number(row.price),link=String(row.affiliateUrl||row.link||"").trim(),category=String(row.category||"geral").slice(0,40),image=String(row.image||"").trim();
-  let valid=false;try{const u=new URL(link);valid=u.protocol==="https:"&&!u.username&&!u.password&&["meli.la","mercadolivre.com.br","www.mercadolivre.com.br","mercadolibre.com","www.mercadolibre.com"].includes(u.hostname.toLowerCase());}catch{}
+  let valid=false;try{const u=new URL(link);valid=u.protocol==="https:"&&!u.username&&!u.password&&["meli.la","mercadolivre.com.br","www.mercadolivre.com.br","mercadolibre.com","www.mercadolibre.com"].includes(u.hostname.toLowerCase())||u.protocol==="https:"&&!u.username&&!u.password&&u.hostname.endsWith(".mercadolivre.com.br");}catch{}
   if(!valid||!title||!Number.isFinite(price)||price<=0||price>1000000)return res.status(400).json({error:"Oferta "+(i+1)+": informe título, preço e link oficial válido."});
   if(image){try{const u=new URL(image);if(u.protocol!=="https:"||u.username||u.password||["localhost","127.0.0.1"].includes(u.hostname)||u.hostname.endsWith(".local"))throw Error();}catch{return res.status(400).json({error:"Imagem inválida na oferta "+(i+1)});}}
   normalized.push({title,price,link,category,image});
  }
- const client=await db.connect();
+ let client;
  try{
-  await client.query("BEGIN");let created=0,skipped=0;
+  client=await db.connect();
+  await client.query("BEGIN");
+  await client.query("SELECT pg_advisory_xact_lock(516830247)");
+  let created=0,skipped=0;
   for(const row of normalized){
    const exists=await client.query("SELECT id FROM affiliate_offers WHERE affiliate_url=$1 LIMIT 1",[row.link]);
    if(exists.rowCount){skipped++;continue;}
    await client.query("INSERT INTO affiliate_offers(title,price,image_url,affiliate_url,category,published) VALUES($1,$2,$3,$4,$5,FALSE)",[row.title,row.price,row.image||null,row.link,row.category]);created++;
   }
   await client.query("COMMIT");return res.json({created,skipped,published:false,notice:"Importadas como rascunho. A plataforma não gera links comissionados."});
- }catch(e){await client.query("ROLLBACK").catch(()=>{});return res.status(503).json({error:"Importação não concluída."});}
- finally{client.release();}
+ }catch(e){if(client)await client.query("ROLLBACK").catch(()=>{});return res.status(503).json({error:"Importação não concluída."});}
+ finally{client?.release();}
 });
 app.post("/api/v2/manual-offers",requireDashboardToken,async(req,res)=>{
  if(!db)return res.status(503).json({error:"Banco não configurado."});
