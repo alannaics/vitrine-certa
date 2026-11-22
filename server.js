@@ -7,6 +7,22 @@ const { registerCatalog } = require("./catalog");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
+// Public assets are explicitly allowlisted; secrets and server source are never exposed.
+const publicAssets = new Set(["studio.css", "studio-pages.css", "studio-shell.css", "studio-shell.js"]);
+app.get("/:asset", (req, res, next) => {
+  if (!publicAssets.has(req.params.asset)) return next();
+  res.set("Cache-Control", "public, max-age=300");
+  res.type(req.params.asset.endsWith(".css") ? "text/css" : "application/javascript");
+  return res.sendFile(path.join(__dirname, req.params.asset));
+});
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.set("X-Frame-Options", "SAMEORIGIN");
+  next();
+});
+
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "studio-home.html")));
 app.get("/classic", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.get("/tools", (req, res) => res.sendFile(path.join(__dirname, req.query.embedded === "1" ? "index.html" : "studio-home.html")));
