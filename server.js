@@ -279,7 +279,7 @@ app.get("/go/:id", async(req,res)=>{
   const q=await db.query("SELECT affiliate_url FROM affiliate_offers WHERE id=$1 AND published=TRUE",[req.params.id]);
   if(!q.rowCount)return res.status(404).send("Oferta indisponível.");
   const target=new URL(q.rows[0].affiliate_url);
-  if(target.protocol!=="https:")return res.status(400).send("Destino inválido.");
+  if(target.protocol!=="https:"||target.username||target.password||!target.hostname||target.hostname==="localhost"||target.hostname.endsWith(".local"))return res.status(400).send("Destino inválido.");
   db.query("INSERT INTO affiliate_clicks(offer_id) VALUES($1)",[req.params.id]).catch(e=>console.error("[click tracking]",e.message));
   res.set("Cache-Control","no-store");
   return res.redirect(302,target.toString());
@@ -310,7 +310,7 @@ app.post("/api/v2/manual-offers",requireDashboardToken,async(req,res)=>{
  const category=String(req.body?.category||"geral").slice(0,40);
  const image=String(req.body?.image||"").trim();
  const link=String(req.body?.affiliateUrl||"").trim();
- const validUrl=value=>{try{const u=new URL(value);return u.protocol==="https:"&&!u.username&&!u.password&&!["localhost","127.0.0.1","::1"].includes(u.hostname)&&!u.hostname.endsWith(".local");}catch{return false;}};
+ const validUrl=value=>{try{const u=new URL(value);const h=u.hostname.toLowerCase();return u.protocol==="https:"&&!u.username&&!u.password&&!["localhost","127.0.0.1","::1"].includes(h)&&!h.endsWith(".local")&&!h.endsWith(".internal")&&!/^\d+\.\d+\.\d+\.\d+$/.test(h)&&!h.includes(":");}catch{return false;}};
  if(!title||!Number.isFinite(price)||price<=0||price>1000000||!validUrl(link)||(image&&!validUrl(image)))return res.status(400).json({error:"Título, preço e URL HTTPS válida são obrigatórios."});
  try{const q=await db.query("INSERT INTO affiliate_offers(title,price,image_url,affiliate_url,category,published) VALUES($1,$2,$3,$4,$5,$6) RETURNING id",[title,price,image||null,link,category,req.body?.published===true]);res.status(201).json({id:q.rows[0].id});}
  catch{res.status(500).json({error:"Falha ao salvar."});}
