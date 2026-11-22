@@ -23,8 +23,8 @@ app.use((_req, res, next) => {
   next();
 });
 
-app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "vitrine-v2.html")));
-app.get("/v2", (_req, res) => res.sendFile(path.join(__dirname, "vitrine-v2.html")));
+app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "affiliate-os.html")));
+app.get("/v2", (_req, res) => res.sendFile(path.join(__dirname, "affiliate-os.html")));
 app.get("/studio", (_req, res) => res.sendFile(path.join(__dirname, "studio-home.html")));
 app.get("/ofertas", (_req, res) => res.sendFile(path.join(__dirname, "ofertas.html")));
 app.get("/classic", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
