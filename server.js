@@ -246,10 +246,14 @@ app.get("/api/shopee/products", requireDashboardToken, async (req, res) => {
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
+const mlDiscoveryCache = new Map();
 app.get("/api/mercadolivre/products", async (req, res) => {
   try {
     const query = String(req.query.q || "").trim().slice(0, 100);
     if (!query) return res.status(400).json({ error: "Informe o nome do produto para pesquisar." });
+    const cacheKey=query.toLocaleLowerCase("pt-BR");
+    const cached=mlDiscoveryCache.get(cacheKey);
+    if(cached&&Date.now()-cached.time<5*60*1000)return res.json({...cached.payload,cached:true});
     const token = await ensureMlToken();
     const headers = { Accept: "application/json", Authorization: "Bearer " + token, "User-Agent": "VitrineCerta/1.0" };
     const url = new URL("https://api.mercadolibre.com/products/search");
@@ -281,7 +285,7 @@ app.get("/api/mercadolivre/products", async (req, res) => {
         permalink: winner.permalink || item.permalink || "", thumbnail: pic || null,
         rating: item.rating?.average ?? winner.rating_average ?? null, category: item.domain_id || item.category_id || "Mercado Livre" };
     }).filter(item => item.title && item.catalogId);
-    const checked = await Promise.allSettled(candidates.slice(0, 30).map(async item => {
+    const checked = await Promise.allSettled(candidates.slice(0, 20).map(async item => {
       let itemId = item.itemId;
       // Enrich each catalog hit automatically, even when the search already names a winner.
       // A catalog entry alone is never treated as a purchasable listing.
@@ -300,7 +304,7 @@ app.get("/api/mercadolivre/products", async (req, res) => {
         console.warn("[ml-catalog-enrichment]", error.name || "request failed");
       }
       if (!itemId) return { catalog: item };
-      const detailResponse = await fetch("https://api.mercadolibre.com/items/" + encodeURIComponent(itemId), { headers });
+      const detailResponse = await fetch("https://api.mercadolibre.com/items/" + encodeURIComponent(itemId), { headers, signal: AbortSignal.timeout(6500) });
       const detail = await detailResponse.json().catch(() => ({}));
       if (!detailResponse.ok || detail.status !== "active" || Number(detail.available_quantity || 0) <= 0) return null;
       let seller = null;
@@ -344,10 +348,13 @@ app.get("/api/mercadolivre/products", async (req, res) => {
       .map(x => ({ ...x.value.catalog, sold_quantity: null, available_quantity: null, listing_status: "catalog",
         availabilityVerified: false, availabilityNote: "Produto de catálogo sem anúncio vencedor confirmado. Não é possível afirmar ranking de vendas ou estoque." }));
     const products = verified.sort((a,b) => (Number(b.sold_quantity)||0) - (Number(a.sold_quantity)||0));
-    res.json({ products, catalogProducts: catalogOnly, count: products.length, verifiedCount: verified.length, catalogCount: catalogOnly.length,
+    const payload={ products, catalogProducts: catalogOnly, count: products.length, verifiedCount: verified.length, catalogCount: catalogOnly.length,
       source: "API oficial de catálogo e anúncios do Mercado Livre",
       ranking: "Anúncios ativos com estoque confirmado, ordenados pelas vendas reportadas; catálogo sem anúncio confirmado aparece separado.",
-      updatedAt: new Date().toISOString() });
+      updatedAt: new Date().toISOString() };
+    if(mlDiscoveryCache.size>60)mlDiscoveryCache.clear();
+    mlDiscoveryCache.set(cacheKey,{time:Date.now(),payload});
+    res.json(payload);
   } catch (error) {
     console.error("[mercadolivre-products]", error.message);
     res.status(error.status === 401 || error.status === 403 ? error.status : 502).json({
