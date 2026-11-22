@@ -41,6 +41,34 @@ function registerBestsellers(app, authenticate, ensureToken) {
     }
   });
 
+  async function publicCatalogPrice(id) {
+    // Read structured price data only from the exact public product page.
+    try {
+      const response = await fetch("https://www.mercadolivre.com.br/p/" + id, {
+        headers: { Accept: "text/html" }, redirect: "manual", signal: AbortSignal.timeout(3500)
+      });
+      if (!response.ok || !response.headers.get("content-type")?.includes("text/html") || !response.body) return null;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let html = "";
+      try {
+        while (html.length < 1_500_000) {
+          const { value, done } = await reader.read();
+          if (done) {
+            html += decoder.decode();
+            break;
+          }
+          html += decoder.decode(value, { stream: true });
+        }
+      } finally {
+        await reader.cancel().catch(() => {});
+      }
+      return structuredCatalogPrice(html, id);
+    } catch {
+      return null;
+    }
+  }
+
   async function searchCatalog(term, category, token) {
     const params = new URLSearchParams({ site_id: "MLB", status: "active", q: term, limit: "20" });
     const data = await get("/products/search?" + params, token);
@@ -67,11 +95,14 @@ function registerBestsellers(app, authenticate, ensureToken) {
       const sale = price === null && categoryId.test(listingId)
         ? await get("/items/" + listingId + "/sale_price?context=channel_marketplace", token).catch(() => null)
         : null;
+      const apiPrice = price ?? (sale?.currency_id === "BRL" ? priceInReais(sale.amount, "BRL") : null);
+      const publicPrice = apiPrice === null ? await publicCatalogPrice(row.id) : null;
       return {
         id: row.id,
         title: listing.title || item.name || row.name,
         image: picture?.secure_url || picture?.url || listing.secure_thumbnail || winner.thumbnail || null,
-        price: price ?? (sale?.currency_id === "BRL" ? priceInReais(sale.amount, "BRL") : null),
+        price: apiPrice ?? publicPrice,
+        priceSource: publicPrice !== null ? "product-page" : null,
         originalPrice: sale?.currency_id === "BRL" ? priceInReais(sale.regular_amount, "BRL") : priceInReais(winner.original_price, winner.currency_id),
         installments: installmentsInReais(winner.installments || listing.installments),
         url: listing.permalink || winner.permalink || "https://www.mercadolivre.com.br/p/" + row.id
@@ -137,10 +168,14 @@ function registerBestsellers(app, authenticate, ensureToken) {
         const sale = /^MLB\d+$/.test(listingId)
           ? await get("/items/" + listingId + "/sale_price?context=channel_marketplace", token).catch(() => null)
           : null;
+        const apiPrice = (sale?.currency_id === "BRL" ? priceInReais(sale.amount, "BRL") : null)
+          ?? priceInReais(item.price, item.currency_id) ?? priceInReais(winner?.price, winner?.currency_id);
+        const publicPrice = apiPrice === null && type === "PRODUCT" ? await publicCatalogPrice(id) : null;
         return {
           id, position, title: item.title || item.name || null,
           image: picture?.secure_url || picture?.url || item.secure_thumbnail || null,
-          price: (sale?.currency_id === "BRL" ? sale.amount : null) ?? item.price ?? winner?.price ?? null,
+          price: apiPrice ?? publicPrice,
+          priceSource: publicPrice !== null ? "product-page" : null,
           originalPrice: sale?.currency_id === "BRL" ? priceInReais(sale.regular_amount, "BRL") : priceInReais(item.original_price, item.currency_id),
           installments: installmentsInReais(item.installments || winner?.installments),
           url: item.permalink || (type === "PRODUCT" ? "https://www.mercadolivre.com.br/p/" + id : null)
@@ -154,4 +189,36 @@ function registerBestsellers(app, authenticate, ensureToken) {
   });
 }
 
-module.exports = { registerBestsellers };
+function structuredCatalogPrice(html, id) {
+  if (!/^MLB\d+$/.test(id)) return null;
+  const productId = value => {
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:" || url.hostname !== "www.mercadolivre.com.br") return "";
+      return url.pathname.match(/\/p\/(MLB\d+)(?:\/|$)/)?.[1] || "";
+    } catch {
+      return "";
+    }
+  };
+  for (const [, payload] of html.matchAll(/<script\b[^>]*\btype=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const data = JSON.parse(payload);
+      const nodes = (Array.isArray(data) ? data : [data]).flatMap(node => [node, ...(Array.isArray(node?.["@graph"]) ? node["@graph"] : [])]);
+      for (const node of nodes) {
+        if (![].concat(node?.["@type"]).includes("Product") ||
+            ![node.url, node["@id"]].some(value => productId(value) === id)) continue;
+        for (const offer of [].concat(node.offers || [])) {
+          if (offer?.["@type"] !== "Offer" || offer.priceCurrency !== "BRL" ||
+              /(?:OutOfStock|SoldOut|Discontinued)$/i.test(offer.availability || "")) continue;
+          const price = Number(offer.price);
+          if (Number.isFinite(price) && price > 0) return price;
+        }
+      }
+    } catch {
+      // Other structured-data blocks may still be usable.
+    }
+  }
+  return null;
+}
+
+module.exports = { registerBestsellers, structuredCatalogPrice };

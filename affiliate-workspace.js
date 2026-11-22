@@ -72,6 +72,7 @@ function rankingCard(product, category) {
   const card = document.createElement("article");
   card.className = "offer";
   const imageUrl = secureMarketplaceUrl(product.image?.replace(/^http:/, "https:"));
+  const url = secureMarketplaceUrl(product.url);
   if (imageUrl) {
     const photo = document.createElement("div");
     photo.className = "photo";
@@ -80,8 +81,20 @@ function rankingCard(product, category) {
     image.alt = "";
     image.loading = "lazy";
     image.onerror = () => photo.remove();
-    photo.append(image);
-    card.append(photo);
+    if (url) {
+      const imageLink = document.createElement("a");
+      imageLink.className = "photo";
+      imageLink.href = url;
+      imageLink.target = "_blank";
+      imageLink.rel = "noopener noreferrer";
+      imageLink.setAttribute("aria-label", "Abrir " + product.title + " no Mercado Livre");
+      imageLink.append(image);
+      image.onerror = () => imageLink.remove();
+      card.append(imageLink);
+    } else {
+      photo.append(image);
+      card.append(photo);
+    }
   }
   const body = document.createElement("div");
   body.className = "offerbody";
@@ -96,6 +109,11 @@ function rankingCard(product, category) {
     price.className = "price";
     price.textContent = currency(product.price);
     body.append(price);
+    if (product.priceSource === "product-page") {
+      const source = document.createElement("small");
+      source.textContent = "Preço consultado na página do produto";
+      body.append(source);
+    }
     if (product.originalPrice > product.price) {
       const discount = document.createElement("small");
       const percent = Math.round((1 - product.price / product.originalPrice) * 100);
@@ -110,10 +128,9 @@ function rankingCard(product, category) {
   }
   if (product.price == null && product.title) {
     const note = document.createElement("small");
-    note.textContent = "Confira o preço no anúncio";
+    note.textContent = "Preço disponível no anúncio";
     body.append(note);
   }
-  const url = secureMarketplaceUrl(product.url);
   if (url) {
     const link = document.createElement("a");
     link.href = url;
@@ -148,6 +165,7 @@ function rankingCard(product, category) {
 async function loadRanking() {
   const current = ++rankingVersion;
   rankingCards.replaceChildren();
+  $("missingPrices").hidden = true;
   rankingStatus.textContent = "Consultando o Mercado Livre…";
   try {
     if (!authToken) throw Error("Valide o acesso administrativo em Integrações.");
@@ -180,10 +198,16 @@ async function loadRanking() {
       const words = normalize(term).split(/\s+/);
       products = products.filter(product => words.every(word => normalize(product.title).includes(word)));
     }
+    let missing = 0;
     if (sort === "priceAsc" || sort === "priceDesc") {
       const direction = sort === "priceAsc" ? 1 : -1;
-      products.sort((a, b) => a.price == null ? Number(b.price != null)
-        : b.price == null ? -1 : direction * (a.price - b.price));
+      const priced = products.filter(product => Number.isFinite(product.price) && product.price > 0);
+      missing = products.length - priced.length;
+      products = priced.sort((a, b) => direction * (a.price - b.price));
+      if (missing) {
+        $("openMarketplaceSearch").href = "https://lista.mercadolivre.com.br/" + encodeURIComponent(term || categoryName);
+        $("missingPrices").hidden = false;
+      }
     }
     const source = ranked ? "Top 20 oficial · " + categoryName
       : response.source === "catalog" ? "Catálogo do Mercado Livre" : "Busca do Mercado Livre";
@@ -191,6 +215,7 @@ async function loadRanking() {
       ? source + " · " + products.length + " resultado(s)" + (ranked && term ? " no ranking para esta palavra-chave" : "")
       : ranked ? source + " · Nenhum produto encontrado. Tente outra palavra-chave ou subcategoria."
       : source + " · Nenhum produto encontrado. Tente outra palavra-chave ou categoria.";
+    if (missing) rankingStatus.textContent = source + " · " + products.length + " com preço consultado. " + missing + " sem preço ficam na lista por relevância.";
     rankingCards.append(...products.map(product => rankingCard(product, categoryName)));
   } catch (error) {
     if (current === rankingVersion) rankingStatus.textContent = error.message;
@@ -207,6 +232,10 @@ $("intelligenceForm").onsubmit = event => {
   loadRanking();
 };
 $("intelligenceSort").onchange = loadRanking;
+$("showRelevant").onclick = () => {
+  $("intelligenceSort").value = "relevance";
+  loadRanking();
+};
 $("rankingAccess").onclick = () => tab("settings");
 $("creativeAccess").onclick = () => tab("settings");
 

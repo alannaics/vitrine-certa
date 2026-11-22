@@ -18,6 +18,11 @@
 .chart-track { height:9px; background:#e8edf8; border-radius:6px; overflow:hidden; margin-top:6px; }
 .chart-fill { height:100%; background:#545be9; border-radius:6px; }
 #commissionChart .chart-fill { background:#16806b; }
+.offer .photo{flex:none;min-height:0;overflow:hidden;grid-template: minmax(0,1fr) / minmax(0,1fr)}
+.offer .photo img{display:block;min-width:0;min-height:0;max-height:100%;object-fit:contain}
+.offerbody{background:#fff;align-content:start}
+.offerbody a:focus-visible,.offerbody button:focus-visible{outline:2px solid #5145cd;outline-offset:2px}
+#missingPrices[hidden]{display:none}
 </style></head><body>
 <aside><div class="brand">◈ vitrine<b>certa.</b></div><nav id="nav"><button data-tab="discover" class="active">▦ Inteligência / Busca</button><button data-tab="creative">✧ Criar conteúdo</button><button data-tab="insights">▤ Resultados</button><button data-tab="catalog">◫ Ofertas</button><button data-tab="overview">◫ Visão geral</button><button data-tab="settings">⚙ Integrações</button></nav><div class="asidefoot">Affiliate OS · Mercado Livre</div></aside>
 <div class="app"><header class="top"><strong>Workspace / <span id="crumb">Inteligência / Busca</span></strong><small>Operação comercial · Brasil</small></header><main class="wrap">
@@ -38,6 +43,7 @@
       <button type="button" class="btn secondary" id="rankingAccess">Validar acesso</button>
     </div>
     <p class="muted workspace-status" id="rankingStatus" role="status">Valide o acesso administrativo em Integrações.</p>
+    <div id="missingPrices" class="actions" hidden><button type="button" class="btn secondary" id="showRelevant">Ver resultados por relevância</button><a class="btn secondary" id="openMarketplaceSearch" target="_blank" rel="noopener noreferrer">Conferir no Mercado Livre</a></div>
     <div id="rankingCards" class="offers"></div>
   </div>
 </section>
@@ -114,4 +120,4 @@ $("importLinks").onclick=async()=>{if(!authToken){message("Valide o token admini
 $("verifyToken").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token.",true);return}try{await request("/api/automation/readiness");$("integrationState").textContent="Token validado. Seu acesso está disponível nesta aba.";sessionStorage.setItem("vcDashboardToken",authToken);message("Acesso administrativo validado.");await Promise.all([loadAdmin(),loadDrafts(),loadRanking(),loadCommissions()])}catch(e){$("integrationState").textContent=e.message;message(e.message,true)}};
 $("connectMl").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token administrativo.",true);return}try{const d=await request("/api/mercadolivre/auth-url",{method:"POST",body:"{}"});if(d.authorizationUrl)location.assign(d.authorizationUrl)}catch(e){message(e.message,true)}};
 loadOffers();loadStatus();
-</script><script src="/affiliate-workspace.js?v=search-intelligence"></script></body></html>
+</script><script src="/affiliate-workspace.js?v=price-layout"></script></body></html>
