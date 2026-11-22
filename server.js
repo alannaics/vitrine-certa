@@ -24,6 +24,7 @@ app.use((_req, res, next) => {
 });
 
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "studio-home.html")));
+app.get("/v2", (_req, res) => res.sendFile(path.join(__dirname, "vitrine-v2.html")));
 app.get("/classic", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.get("/tools", (req, res) => res.sendFile(path.join(__dirname, req.query.embedded === "1" ? "index.html" : "studio-home.html")));
 app.get("/settings", (_req, res) => res.sendFile(path.join(__dirname, "studio-home.html")));
