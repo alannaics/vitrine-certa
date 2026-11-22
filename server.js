@@ -355,6 +355,32 @@ app.post("/api/affiliate/inspect", requireDashboardToken, async (req, res) => {
   }
 });
 
+app.get("/api/finance/shopee-summary", requireDashboardToken, async (req,res)=>{
+ try{
+  const days=Math.max(1,Math.min(30,Number.parseInt(req.query.days,10)||30));
+  const end=Math.floor(Date.now()/1000),start=end-days*86400;
+  const seen=new Set(),records=[];
+  let scrollId="",hasNext=true,pages=0;
+  while(hasNext&&pages<10){
+   const scrollArg=scrollId?", scrollId: "+JSON.stringify(scrollId):"";
+   const query="{ conversionReport(purchaseTimeStart: "+start+", purchaseTimeEnd: "+end+scrollArg+", limit: 100) { nodes { conversionId totalCommission orders { orderId orderStatus } } pageInfo { hasNextPage scrollId } } }";
+   const data=await shopeeRequest(query);
+   const report=data?.conversionReport||{};
+   for(const n of report.nodes||[]){
+    const id=String(n.conversionId||"");
+    if(!id||seen.has(id))continue;
+    seen.add(id);
+    records.push({id,commission:Number(n.totalCommission)||0,statuses:(n.orders||[]).map(o=>o.orderStatus)});
+   }
+   hasNext=Boolean(report.pageInfo?.hasNextPage);
+   const next=String(report.pageInfo?.scrollId||"");
+   if(!next||next===scrollId)hasNext=false;
+   scrollId=next;pages++;
+  }
+  const total=records.reduce((n,r)=>n+r.commission,0);
+  res.json({platform:"Shopee",periodDays:days,conversions:records.length,reportedCommission:Math.round(total*100)/100,currency:"BRL",partial:hasNext,source:"Shopee Affiliate conversionReport",note:"Comissão informada pela API, incluindo possíveis pedidos pendentes ou cancelados. Não representa necessariamente comissão aprovada, recebida ou lucro líquido.",updatedAt:new Date().toISOString()});
+ }catch(e){res.status(e.status||502).json({error:e.message||"Falha ao consultar comissões Shopee."})}
+});
 app.get("/api/shopee/conversions", requireDashboardToken, async (req, res) => {
   try {
     const start = Number(req.query.start);
