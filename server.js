@@ -9,9 +9,9 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "studio-home.html")));
 app.get("/classic", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
-app.get("/tools", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
-app.get("/finance", (_req, res) => res.sendFile(path.join(__dirname, "finance.html")));
-app.get("/catalog", (_req, res) => res.sendFile(path.join(__dirname, "catalog.html")));
+app.get("/tools", (req, res) => res.sendFile(path.join(__dirname, req.query.embedded === "1" ? "index.html" : "studio-home.html")));
+app.get("/finance", (req, res) => res.sendFile(path.join(__dirname, req.query.embedded === "1" ? "finance.html" : "studio-home.html")));
+app.get("/catalog", (req, res) => res.sendFile(path.join(__dirname, req.query.embedded === "1" ? "catalog.html" : "studio-home.html")));
 
 const PORT = process.env.PORT || 3000;
 const APP_ID = process.env.SHOPEE_APP_ID;
