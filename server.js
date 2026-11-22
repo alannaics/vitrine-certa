@@ -28,7 +28,7 @@ app.get("/v2", (_req, res) => res.sendFile(path.join(__dirname, "vitrine-v2.html
 app.get("/studio", (_req, res) => res.sendFile(path.join(__dirname, "studio-home.html")));
 app.get("/ofertas", (_req, res) => res.sendFile(path.join(__dirname, "ofertas.html")));
 app.get("/classic", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
-app.get("/tools", (req, res) => res.sendFile(path.join(__dirname, req.query.embedded === "1" ? "index.html" : "studio-home.html")));
+app.get("/tools", (req, res) => req.query.embedded === "1" ? res.sendFile(path.join(__dirname, "index.html")) : res.redirect(302, "/ofertas"));
 app.get("/settings", (_req, res) => res.sendFile(path.join(__dirname, "studio-home.html")));
 app.get("/finance", (req, res) => res.sendFile(path.join(__dirname, req.query.embedded === "1" ? "finance.html" : "studio-home.html")));
 app.get("/catalog", (req, res) => res.sendFile(path.join(__dirname, req.query.embedded === "1" ? "catalog.html" : "studio-home.html")));
