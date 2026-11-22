@@ -199,7 +199,6 @@ app.get("/api/automation/readiness", requireDashboardToken, async (_req,res) => 
   const checks={
     database:{ready:false},
     mercadoLivreOAuth:{ready:mlConfigured()&&Boolean(mlRefreshToken)},
-    shopeeOffers:{ready:Boolean(APP_ID&&APP_SECRET)},
     affiliateAttribution:{ready:false,reason:"A API OAuth de vendedor não confirma atribuição de comissões do programa de afiliados."},
     autonomousPublishing:{ready:false,reason:"Nenhum canal de publicação automática autorizado está configurado."}
   };
@@ -207,7 +206,6 @@ app.get("/api/automation/readiness", requireDashboardToken, async (_req,res) => 
   else checks.database.reason="Banco não configurado.";
   const blockers=[];
   if(!checks.database.ready)blockers.push("database");
-  if(!checks.shopeeOffers.ready)blockers.push("shopee_credentials");
   if(!checks.affiliateAttribution.ready)blockers.push("affiliate_attribution");
   if(!checks.autonomousPublishing.ready)blockers.push("publishing_channel");
   res.json({readyForAutonomousSales:false,checks,blockers,verifiedAt:new Date().toISOString(),note:"Dados de produtos e vendas atribuídas são integrações distintas. Nenhuma venda é presumida."});
@@ -215,7 +213,7 @@ app.get("/api/automation/readiness", requireDashboardToken, async (_req,res) => 
 app.get("/api/status", (_req, res) => {
   res.json({
     database: { configured: Boolean(db) },
-    shopee: { configured: Boolean(APP_ID && APP_SECRET) },
+    catalog: { configured: Boolean(db), source: "curated_affiliate_offers" },
     mercadoLivre: { configured: mlConfigured(), connected: Boolean(mlRefreshToken), mode: mlRefreshToken ? "oauth_connected_persistent" : "manual", note: "OAuth de consulta da API de vendedores; métricas de afiliados permanecem separadas." }
   });
 });
