@@ -10,10 +10,6 @@ services:
         value: 20
       - key: DASHBOARD_API_TOKEN
         sync: false
-      - key: SHOPEE_APP_ID
-        sync: false
-      - key: SHOPEE_APP_SECRET
-        sync: false
       - key: ML_CLIENT_ID
         sync: false
       - key: ML_CLIENT_SECRET
