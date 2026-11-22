@@ -2,7 +2,7 @@ const categoryPath = $("categoryPath");
 const rankingStatus = $("rankingStatus");
 const rankingCards = $("rankingCards");
 let rankingVersion = 0;
-let selectedProductId = null;
+let selectedProduct = null;
 let shareText = "";
 
 function savedLink(id) {
@@ -116,7 +116,7 @@ function rankingCard(product) {
     create.type = "button";
     create.textContent = "Criar conteúdo";
     create.onclick = () => {
-      selectedProductId = product.id;
+      selectedProduct = product;
       $("creativeProduct").value = product.title;
       $("creativePrice").value = product.price ?? "";
       $("creativeLink").value = savedLink(product.id);
@@ -170,7 +170,48 @@ $("rankingRefresh").onclick = loadRanking;
 $("rankingAccess").onclick = () => tab("settings");
 $("creativeAccess").onclick = () => tab("settings");
 
-$("creativeProduct").oninput = () => { selectedProductId = null; };
+$("creativeSaveDraft").onclick = async () => {
+  const form = $("creativeForm");
+  const status = $("creativeStatus");
+  if (!form.reportValidity()) return;
+  if (!authToken) {
+    status.textContent = "Valide o acesso administrativo em Integrações.";
+    return;
+  }
+  const data = Object.fromEntries(new FormData(form));
+  const link = data.link.trim();
+  if (!officialLink(link)) {
+    status.textContent = "Cole o link HTTPS gerado na sua conta de afiliado do Mercado Livre.";
+    return;
+  }
+  const button = $("creativeSaveDraft");
+  button.disabled = true;
+  status.textContent = "Salvando rascunho…";
+  try {
+    const product = selectedProduct;
+    const category = [...categoryPath.querySelectorAll("select")].findLast(select => select.value)?.selectedOptions[0].text;
+    const result = await request("/api/v2/affiliate-links/import", {
+      method: "POST",
+      body: JSON.stringify({ offers: [{
+        title: data.product, price: Number(data.price), affiliateUrl: link,
+        image: secureMarketplaceUrl(product?.image?.replace(/^http:/, "https:")),
+        category: product ? category : undefined
+      }] })
+    });
+    if (product) {
+      try { localStorage.setItem("vcAffiliateLink:" + product.id, link); } catch {}
+    }
+    status.textContent = result.created
+      ? "Rascunho salvo. Revise e publique em Ofertas → Gerenciar rascunhos."
+      : "Esse link já está cadastrado. Confira em Ofertas → Gerenciar rascunhos.";
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+};
+
+$("creativeProduct").oninput = () => { selectedProduct = null; };
 $("creativeForm").onsubmit = async event => {
   event.preventDefault();
   const status = $("creativeStatus");
@@ -188,8 +229,8 @@ $("creativeForm").onsubmit = async event => {
     data.link = data.link.trim();
     if (!officialLink(data.link)) throw Error("Cole o link HTTPS gerado na sua conta de afiliado do Mercado Livre.");
     data.price = currency(data.price);
-    if (selectedProductId) {
-      try { localStorage.setItem("vcAffiliateLink:" + selectedProductId, data.link); } catch {}
+    if (selectedProduct) {
+      try { localStorage.setItem("vcAffiliateLink:" + selectedProduct.id, data.link); } catch {}
     }
     shareText = data.product + "\n" + data.price + " · preço sujeito a alteração\nLink de afiliado: " + data.link;
     $("shareOffer").textContent = shareText;

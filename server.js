@@ -104,6 +104,7 @@ async function initializeDatabase() {
   await db.query("CREATE TABLE IF NOT EXISTS app_secrets (secret_name TEXT PRIMARY KEY, secret_value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS dashboard_state (id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1), state JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS saved_campaigns (id TEXT PRIMARY KEY, product_name TEXT NOT NULL, format TEXT, content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+  await db.query("CREATE TABLE IF NOT EXISTS ml_oauth_states (state_hash TEXT PRIMARY KEY, expires_at TIMESTAMPTZ NOT NULL)");
   await loadMlTokens();
 }
 const ML_CLIENT_SECRET = process.env.ML_CLIENT_SECRET;
@@ -111,15 +112,12 @@ const ML_REDIRECT_URI = process.env.ML_REDIRECT_URI || "https://vitrine-certa.on
 let mlAccessToken = null;
 let mlRefreshToken = null;
 let mlTokenExpiresAt = 0;
-let mlOAuthState = null;
 
 function mlConfigured() {
   return Boolean(ML_CLIENT_ID && ML_CLIENT_SECRET && ML_REDIRECT_URI);
 }
-function safeEqual(a, b) {
-  const x = Buffer.from(String(a || ""));
-  const y = Buffer.from(String(b || ""));
-  return x.length === y.length && crypto.timingSafeEqual(x, y);
+function oauthStateHash(state) {
+  return crypto.createHash("sha256").update(state).digest("hex");
 }
 async function mlTokenRequest(body) {
   const response = await fetch("https://api.mercadolibre.com/oauth/token", {
@@ -554,9 +552,19 @@ app.get("/api/mercadolivre/discovery", async (_req, res) => {
 app.get("/oauth/mercadolivre/callback", async (req, res) => {
   try {
     if (!mlConfigured()) return res.status(503).send("Configure ML_CLIENT_ID, ML_CLIENT_SECRET e ML_REDIRECT_URI no Render.");
-    if (!mlOAuthState || !safeEqual(req.query.state, mlOAuthState)) return res.status(400).send("Estado OAuth inválido ou expirado. Volte ao Vitrine Certa e tente conectar novamente.");
-    mlOAuthState = null;
-    if (req.query.error) return res.status(400).send("Autorização não concluída: " + String(req.query.error_description || req.query.error));
+    if (!db) return res.status(503).type("text").send("Banco de dados indisponível.");
+    const state = req.query.state;
+    if (typeof state !== "string" || !/^[a-f0-9]{48}$/.test(state)) {
+      return res.status(400).type("text").send("Estado OAuth inválido ou expirado. Inicie a conexão novamente.");
+    }
+    const consumed = await db.query(
+      "DELETE FROM ml_oauth_states WHERE state_hash = $1 AND expires_at > NOW() RETURNING state_hash",
+      [oauthStateHash(state)]
+    );
+    if (!consumed.rowCount) {
+      return res.status(400).type("text").send("Estado OAuth inválido ou expirado. Inicie a conexão novamente.");
+    }
+    if (req.query.error) return res.status(400).type("text").send("Autorização não concluída. Volte ao painel para tentar novamente.");
     const code = String(req.query.code || "");
     if (!code) return res.status(400).send("Código de autorização não recebido.");
     const data = await mlTokenRequest({
@@ -570,19 +578,29 @@ app.get("/oauth/mercadolivre/callback", async (req, res) => {
     mlRefreshToken = data.refresh_token;
     mlTokenExpiresAt = Date.now() + Number(data.expires_in || 21600) * 1000;
     await saveMlTokens();
-    res.type("html").send("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Mercado Livre conectado</title><body style='font:16px system-ui;max-width:560px;margin:12vh auto;padding:24px;color:#28232a'><h2>Autorização recebida</h2><p>O Mercado Livre foi conectado à Vitrine Certa. A autorização é armazenada de forma criptografada no banco quando ele está configurado.</p><p>Volte ao painel para verificar o status. A conexão será renovada automaticamente enquanto a autorização continuar válida.</p><a href='/'>Voltar ao Vitrine Certa</a></body></html>");
-  } catch (e) { res.status(e.status || 500).send("Não foi possível concluir a conexão: " + String(e.message)); }
+    res.type("html").send("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Mercado Livre conectado</title><body style='font:16px system-ui;max-width:560px;margin:12vh auto;padding:24px;color:#28232a'><h2>Autorização recebida</h2><p>O Mercado Livre foi conectado à Vitrine Certa. A autorização é armazenada de forma criptografada no banco quando ele está configurado.</p><p>Volte ao painel para verificar o status. A conexão será renovada automaticamente enquanto a autorização continuar válida.</p><a href='/v2'>Voltar à Vitrine Certa</a></body></html>");
+  } catch (e) { res.status(e.status || 500).type("text").send("Não foi possível concluir a conexão. Inicie a conexão novamente."); }
 });
 
-app.post("/api/mercadolivre/auth-url", requireDashboardToken, (_req, res) => {
+app.post("/api/mercadolivre/auth-url", requireDashboardToken, async (_req, res) => {
   if (!mlConfigured()) return res.status(503).json({ error: "Configure as variáveis ML_CLIENT_ID, ML_CLIENT_SECRET e ML_REDIRECT_URI no Render." });
-  mlOAuthState = crypto.randomBytes(24).toString("hex");
+  if (!db) return res.status(503).json({ error: "Banco de dados indisponível." });
+  const state = crypto.randomBytes(24).toString("hex");
+  try {
+    await db.query("DELETE FROM ml_oauth_states WHERE expires_at <= NOW()");
+    await db.query(
+      "INSERT INTO ml_oauth_states (state_hash, expires_at) VALUES ($1, NOW() + INTERVAL '10 minutes')",
+      [oauthStateHash(state)]
+    );
+  } catch {
+    return res.status(503).json({ error: "Não foi possível preparar a autorização. Tente novamente." });
+  }
   const url = new URL("https://auth.mercadolivre.com.br/authorization");
   url.search = new URLSearchParams({
     response_type: "code",
     client_id: ML_CLIENT_ID,
     redirect_uri: ML_REDIRECT_URI,
-    state: mlOAuthState
+    state
   }).toString();
   res.json({ authorizationUrl: url.toString() });
 });

@@ -47,7 +47,7 @@
       </div>
       <p class="muted workspace-note">Gere seu link para o produto na <a href="https://www.mercadolivre.com.br/l/afiliados-gere-seus-links" target="_blank" rel="noopener noreferrer">Central de Afiliados</a> e cole aqui. Confira o preço no anúncio antes de divulgar.</p>
       <label>Informações verificadas sobre o produto (opcional)<textarea class="field" name="details" rows="3" maxlength="1000"></textarea></label>
-      <div class="actions"><button class="btn" id="creativeGenerate" type="submit">Gerar pacote com Gemini</button><button class="btn secondary" id="creativeAccess" type="button">Validar acesso</button></div>
+      <div class="actions"><button class="btn" id="creativeGenerate" type="submit">Gerar pacote com Gemini</button><button class="btn secondary" id="creativeSaveDraft" type="button">Salvar oferta como rascunho</button><button class="btn secondary" id="creativeAccess" type="button">Validar acesso</button></div>
     </form>
     <p class="muted workspace-status" id="creativeStatus" role="status"></p>
     <div class="studio-output" id="creativeOutput" hidden>
@@ -108,4 +108,4 @@ $("importLinks").onclick=async()=>{if(!authToken){message("Valide o token admini
 $("verifyToken").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token.",true);return}try{await request("/api/automation/readiness");$("integrationState").textContent="Token validado. Seu acesso está disponível nesta aba.";sessionStorage.setItem("vcDashboardToken",authToken);message("Acesso administrativo validado.");await Promise.all([loadAdmin(),loadDrafts(),loadRanking(),loadCommissions()])}catch(e){$("integrationState").textContent=e.message;message(e.message,true)}};
 $("connectMl").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token administrativo.",true);return}try{const d=await request("/api/mercadolivre/auth-url",{method:"POST",body:"{}"});if(d.authorizationUrl)location.assign(d.authorizationUrl)}catch(e){message(e.message,true)}};
 loadOffers();loadStatus();
-</script><script src="/affiliate-workspace.js?v=analytics-demo"></script></body></html>
+</script><script src="/affiliate-workspace.js?v=affiliate-drafts"></script></body></html>
