@@ -217,6 +217,30 @@ app.get("/api/v2/manual-offers/manage",requireDashboardToken,async(_req,res)=>{
  try{const q=await db.query("SELECT * FROM affiliate_offers ORDER BY created_at DESC LIMIT 200");res.json({offers:q.rows});}
  catch{res.status(503).json({error:"Catálogo indisponível."});}
 });
+app.post("/api/v2/affiliate-links/import",requireDashboardToken,async(req,res)=>{
+ if(!db)return res.status(503).json({error:"Banco não configurado."});
+ const rows=req.body?.offers;
+ if(!Array.isArray(rows)||!rows.length||rows.length>100)return res.status(400).json({error:"Envie de 1 a 100 ofertas."});
+ const normalized=[];
+ for(let i=0;i<rows.length;i++){
+  const row=rows[i]||{},title=String(row.title||"").trim().slice(0,180),price=Number(row.price),link=String(row.affiliateUrl||row.link||"").trim(),category=String(row.category||"geral").slice(0,40),image=String(row.image||"").trim();
+  let valid=false;try{const u=new URL(link);valid=u.protocol==="https:"&&!u.username&&!u.password&&["meli.la","mercadolivre.com.br","www.mercadolivre.com.br","mercadolibre.com","www.mercadolibre.com"].includes(u.hostname.toLowerCase());}catch{}
+  if(!valid||!title||!Number.isFinite(price)||price<=0||price>1000000)return res.status(400).json({error:"Oferta "+(i+1)+": informe título, preço e link oficial válido."});
+  if(image){try{const u=new URL(image);if(u.protocol!=="https:"||u.username||u.password||["localhost","127.0.0.1"].includes(u.hostname)||u.hostname.endsWith(".local"))throw Error();}catch{return res.status(400).json({error:"Imagem inválida na oferta "+(i+1)});}}
+  normalized.push({title,price,link,category,image});
+ }
+ const client=await db.connect();
+ try{
+  await client.query("BEGIN");let created=0,skipped=0;
+  for(const row of normalized){
+   const exists=await client.query("SELECT id FROM affiliate_offers WHERE affiliate_url=$1 LIMIT 1",[row.link]);
+   if(exists.rowCount){skipped++;continue;}
+   await client.query("INSERT INTO affiliate_offers(title,price,image_url,affiliate_url,category,published) VALUES($1,$2,$3,$4,$5,FALSE)",[row.title,row.price,row.image||null,row.link,row.category]);created++;
+  }
+  await client.query("COMMIT");return res.json({created,skipped,published:false,notice:"Importadas como rascunho. A plataforma não gera links comissionados."});
+ }catch(e){await client.query("ROLLBACK").catch(()=>{});return res.status(503).json({error:"Importação não concluída."});}
+ finally{client.release();}
+});
 app.post("/api/v2/manual-offers",requireDashboardToken,async(req,res)=>{
  if(!db)return res.status(503).json({error:"Banco não configurado."});
  const title=String(req.body?.title||"").trim().slice(0,180);
