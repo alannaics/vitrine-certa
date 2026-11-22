@@ -418,13 +418,10 @@ async function searchDiscoveryProducts(){
    {id:"score",label:"Sinais comerciais",yes:displayable.some(p=>commercialOfferScore(p).known>0)}
   ];
   const controls=document.createElement("div");controls.className="vc-sort-controls";
-  if(references.length){
+  if(references.length&&!displayable.length){
    const info=document.createElement("div");info.className="vc-catalog-notice";
-   const message=document.createElement("p");message.textContent=references.length+" referências de catálogo sem anúncio verificado. Elas não são ofertas com foto e preço confirmados.";
-   const toggle=document.createElement("button");toggle.type="button";toggle.className="vc-sort-chip";toggle.textContent=window.vcShowCatalogReferences?"Ocultar referências":"Mostrar referências";
-   toggle.onclick=()=>{window.vcShowCatalogReferences=!window.vcShowCatalogReferences;searchDiscoveryProductsLastRender()};
-   const searchLink=document.createElement("a");searchLink.className="vc-catalog-search-link";searchLink.textContent="Pesquisar anúncios no Mercado Livre";searchLink.href="https://lista.mercadolivre.com.br/"+encodeURIComponent(query);searchLink.target="_blank";searchLink.rel="noopener noreferrer";
-   info.append(message,toggle,searchLink);results.append(info);
+   const message=document.createElement("p");message.textContent="A API retornou "+references.length+" referências de catálogo, mas nenhum anúncio ativo com preço e foto confirmados. A pesquisa automática de ofertas depende da autorização da fonte de dados.";
+   info.append(message);results.append(info);
   }
   const title=document.createElement("strong");title.textContent="Ordenar por";controls.append(title);
   const choices=document.createElement("div");choices.className="vc-sort-choices";
@@ -445,7 +442,7 @@ async function searchDiscoveryProducts(){
   renderDiscoveryProductCards();
   const errors=groups.filter(g=>g.error).map(g=>g.market+": "+g.error);
   const catalogOnly=all.length>0&&all.every(p=>p.resultType==="catalog");
-  status.textContent=all.length+" resultado(s) listado(s) para \""+query+"\". "+groups.filter(g=>g.items.length).map(g=>g.market+": "+g.items.length).join(" · ")+(errors.length?" | Indisponível: "+errors.join(" | "):"")+(catalogOnly?" São referências de catálogo, sem fotos e preços confirmados.":"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
+  status.textContent=displayable.length+" anúncio(s) confirmado(s) para \""+query+"\"."+(errors.length?" | Fonte indisponível: "+errors.join(" | "):"")+(catalogOnly?" A fonte atual não disponibilizou anúncios com preço e foto.":"")+(all.length?"":" Nenhuma fonte retornou itens; tente um termo mais específico.");
  }catch(e){status.textContent=e.message;}
  finally{button.disabled=false;}
 }
@@ -490,7 +487,7 @@ function renderDiscoveryProductCards(){
   const priceEl=document.createElement("strong");priceEl.className="vc-market-price";priceEl.textContent=price===null?"Preço não informado":price.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
   const extra=document.createElement("small");extra.className="vc-market-extra";extra.textContent=p.freeShipping||p.shipping?.free_shipping?"Frete grátis":p.resultType==="catalog"?"Item de catálogo":"Consulte as condições";
   const actions=document.createElement("div");actions.className="vc-market-actions";
-  const saveBtn=document.createElement("button");saveBtn.type="button";saveBtn.className="btn primary";saveBtn.textContent="Salvar";saveBtn.onclick=()=>saveDiscoveryProduct(index);
+  const saveBtn=document.createElement("button");saveBtn.type="button";saveBtn.className="btn primary";saveBtn.textContent="Salvar";saveBtn.onclick=()=>saveDiscoveryProduct((window.discoveryProductResults||[]).indexOf(p));
   actions.append(saveBtn);
   if(link.startsWith("https://")){const open=document.createElement("a");open.className="btn";open.href=link;open.target="_blank";open.rel="noopener noreferrer";open.textContent="Ver anúncio";actions.append(open)}
   content.append(source,heading,priceEl,extra,actions);card.append(imageBox,content);target.append(card);
