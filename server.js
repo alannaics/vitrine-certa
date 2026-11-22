@@ -2,10 +2,12 @@ const express = require("express");
 const crypto = require("node:crypto");
 const path = require("node:path");
 const { Pool } = require("pg");
+const { registerFinance, initializeFinance } = require("./finance");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.get("/finance", (_req, res) => res.sendFile(path.join(__dirname, "finance.html")));
 
 const PORT = process.env.PORT || 3000;
 const APP_ID = process.env.SHOPEE_APP_ID;
@@ -70,6 +72,7 @@ const db = DATABASE_URL ? new Pool({
   connectionTimeoutMillis: 10000
 }) : null;
 
+registerFinance(app, db, requireDashboardToken);
 function tokenEncryptionKey() {
   if (!ML_CLIENT_SECRET) return null;
   return crypto.scryptSync(ML_CLIENT_SECRET, "vitrine-certa-ml-oauth-v1", 32);
@@ -109,6 +112,7 @@ async function loadMlTokens() {
 }
 async function initializeDatabase() {
   if (!db) return;
+  await initializeFinance(db);
   await db.query("CREATE TABLE IF NOT EXISTS app_secrets (secret_name TEXT PRIMARY KEY, secret_value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS dashboard_state (id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1), state JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS saved_campaigns (id TEXT PRIMARY KEY, product_name TEXT NOT NULL, format TEXT, content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
