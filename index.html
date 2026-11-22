@@ -381,8 +381,15 @@ async function searchDiscoveryProducts(){
  const jobs=[];
  if(market==="both"||market==="ml")jobs.push((async()=>{
   try{
-   const r=await fetch("/api/catalog/mercadolivre?q="+encodeURIComponent(query),{cache:"no-store"});
-   const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Mercado Livre HTTP "+r.status);
+   let r=await fetch("/api/catalog/mercadolivre?q="+encodeURIComponent(query),{cache:"no-store"});
+   let d=await r.json().catch(()=>({}));
+   if(!r.ok){
+     // Keep the previously working discovery source available if the official search is restricted.
+     r=await fetch("/api/mercadolivre/products?q="+encodeURIComponent(query),{cache:"no-store"});
+     d=await r.json().catch(()=>({}));
+     if(!r.ok)throw new Error(d.error||"Mercado Livre HTTP "+r.status);
+     return {market:"Mercado Livre",items:[...(d.products||[]).map(p=>({...p,resultType:"active"})),...(d.catalogProducts||[]).map(p=>({...p,resultType:"catalog"}))],error:null};
+   }
    return {market:"Mercado Livre",items:(d.products||[]).map(p=>({...p,resultType:"search",imageUrl:p.thumbnail,productName:p.title,offerLink:p.permalink,freeShipping:p.freeShipping})),error:null};
   }catch(e){return {market:"Mercado Livre",items:[],error:e.message};}
  })());
