@@ -283,15 +283,21 @@ app.get("/api/mercadolivre/products", async (req, res) => {
     }).filter(item => item.title && item.catalogId);
     const checked = await Promise.allSettled(candidates.slice(0, 30).map(async item => {
       let itemId = item.itemId;
-      // Product detail may expose the current buy-box listing even when product search omits it.
-      if (!itemId) {
-        const productResponse = await fetch("https://api.mercadolibre.com/products/" + encodeURIComponent(item.catalogId), { headers });
-        const productDetail = await productResponse.json().catch(() => ({}));
-        if(productResponse.ok){item.thumbnail = item.thumbnail || photoUrl(productDetail.pictures) || photoUrl(productDetail.main_picture) || photoUrl(productDetail.thumbnail);item.price = item.price ?? productDetail.buy_box_winner?.price ?? null;}
+      // Enrich each catalog hit automatically, even when the search already names a winner.
+      // A catalog entry alone is never treated as a purchasable listing.
+      try {
+        const productResponse = await fetch("https://api.mercadolibre.com/products/" + encodeURIComponent(item.catalogId), {
+          headers, signal: AbortSignal.timeout(6500)
+        });
         if (productResponse.ok) {
+          const productDetail = await productResponse.json().catch(() => ({}));
           const winner = productDetail.buy_box_winner || productDetail.buyBoxWinner || {};
-          itemId = winner.item_id || winner.itemId || winner.id || null;
+          item.thumbnail = item.thumbnail || photoUrl(productDetail.pictures) || photoUrl(productDetail.main_picture) || photoUrl(productDetail.thumbnail);
+          item.price = item.price ?? winner.price ?? null;
+          itemId = itemId || winner.item_id || winner.itemId || winner.id || null;
         }
+      } catch (error) {
+        console.warn("[ml-catalog-enrichment]", error.name || "request failed");
       }
       if (!itemId) return { catalog: item };
       const detailResponse = await fetch("https://api.mercadolibre.com/items/" + encodeURIComponent(itemId), { headers });
