@@ -78,7 +78,7 @@ const url=new URL(a.href,location.origin);if(url.origin!==location.origin)return
 const section=url.pathname==="/"?"home":url.pathname.slice(1);
 if(section==="home"||moduleMeta[section]){e.preventDefault();go(section,url.searchParams.get("q")||"")}
 });
-const originalForm=document.getElementById("searchForm");originalForm.addEventListener("submit",e=>{e.preventDefault();const q=document.getElementById("searchTerm").value.trim();if(q)go("catalog",q)});
+const originalForm=document.getElementById("searchForm");originalForm.addEventListener("submit",e=>{e.preventDefault();e.stopImmediatePropagation();const q=document.getElementById("searchTerm").value.trim();if(q)go("catalog",q)},true);
 document.querySelectorAll("[data-term]").forEach(b=>b.addEventListener("click",e=>{e.stopImmediatePropagation();go("catalog",b.dataset.term)},true));
 window.addEventListener("popstate",()=>{const section=location.pathname.slice(1)||"home";go(moduleMeta[section]?section:"home",new URLSearchParams(location.search).get("q")||"",false)});
 window.addEventListener("message",e=>{if(e.origin!==location.origin||e.source!==frame.contentWindow||e.data?.type!=="vc-tools-height")return;const h=Number(e.data.height);if(Number.isFinite(h)&&h>=400&&h<=30000)frame.style.height=h+"px"});
