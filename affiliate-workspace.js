@@ -245,7 +245,7 @@ async function loadRanking() {
         $("missingPrices").hidden = false;
       }
     }
-    const source = automatic ? "Seleção automática · Estoque verificado" : ranked ? "Top 20 oficial · " + categoryName
+    const source = automatic ? "Seleção automática · Anúncios disponíveis" : ranked ? "Top 20 oficial · " + categoryName
       : response.source === "catalog" ? "Catálogo do Mercado Livre" : "Busca do Mercado Livre";
     rankingStatus.textContent = products.length
       ? source + " · " + products.length + " resultado(s)" + (ranked && term ? " no ranking para esta palavra-chave" : "")

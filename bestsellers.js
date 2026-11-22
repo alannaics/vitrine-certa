@@ -3,11 +3,58 @@ const endpoints = { ITEM: "items", PRODUCT: "products", USER_PRODUCT: "user-prod
 const categoryId = /^MLB\d+$/;
 
 function registerBestsellers(app, authenticate, ensureToken) {
+  const cache = new Map();
+  const pending = new Map();
+  const queue = [];
+  let running = 0;
+  let cooldownUntil = 0;
+
+  function drain() {
+    while (running < 5 && queue.length) {
+      running++;
+      queue.shift()().finally(() => { running--; drain(); });
+    }
+  }
+
+  function limited(retryAfter) {
+    return Object.assign(new Error("O Mercado Livre limitou temporariamente as consultas. Tente novamente em instantes."), { status: 429, retryAfter });
+  }
+
   async function get(endpoint, token) {
+    const cached = cache.get(endpoint);
+    if (cached && cached.expires > Date.now()) return cached.data;
+    if (pending.has(endpoint)) return pending.get(endpoint);
+    const promise = new Promise((resolve, reject) => {
+      queue.push(async () => {
+        try {
+          if (Date.now() < cooldownUntil) throw limited(Math.ceil((cooldownUntil - Date.now()) / 1000));
+          const data = await fetchData(endpoint, token);
+          if (cache.size >= 800) cache.delete(cache.keys().next().value);
+          const ttl = endpoint.startsWith("/categories/") || endpoint === "/sites/MLB/categories" ? 3600000 : 120000;
+          cache.set(endpoint, { data, expires: Date.now() + ttl });
+          resolve(data);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      drain();
+    }).finally(() => pending.delete(endpoint));
+    pending.set(endpoint, promise);
+    return promise;
+  }
+
+  async function fetchData(endpoint, token) {
     const response = await fetch(api + endpoint, {
       headers: { Authorization: "Bearer " + token, Accept: "application/json" },
       signal: AbortSignal.timeout(6500)
     });
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("Retry-After");
+      const seconds = Math.max(1, Number(retryAfter) || Math.ceil((Date.parse(retryAfter) - Date.now()) / 1000) || 20);
+      cooldownUntil = Math.max(cooldownUntil, Date.now() + seconds * 1000);
+      await response.body?.cancel();
+      throw limited(seconds);
+    }
     if (!response.ok) {
       const error = new Error("O Mercado Livre retornou HTTP " + response.status + ".");
       error.status = response.status;
@@ -17,6 +64,10 @@ function registerBestsellers(app, authenticate, ensureToken) {
   }
 
   function handleError(res, error) {
+    if (error.status === 429) {
+      res.set("Retry-After", String(error.retryAfter || 20));
+      return res.status(429).json({ error: error.message });
+    }
     const accessDenied = [401, 403].includes(error.status);
     res.status(accessDenied ? 403 : 502).json({
       error: accessDenied
@@ -69,8 +120,9 @@ function registerBestsellers(app, authenticate, ensureToken) {
     }
   }
 
-  function hasStock(item) {
-    return item?.status === "active" && Number(item.available_quantity) > 0 &&
+  function isBuyable(item, activeListing = false) {
+    return item && (item.status === "active" || (activeListing && item.status == null)) &&
+      (item.available_quantity == null || Number(item.available_quantity) > 0) &&
       !item.sub_status?.includes("out_of_stock") && typeof item.permalink === "string" &&
       /^https:\/\/(?:[\w-]+\.)?mercadolivre\.com\.br\//i.test(item.permalink);
   }
@@ -95,7 +147,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
       const listingId = winner.item_id;
       if (!categoryId.test(listingId)) return null;
       const listing = await get("/items/" + listingId, token).catch(() => null);
-      if (!hasStock(listing)) return null;
+      if (!isBuyable(listing)) return null;
       if (!await inCategory(winner.category_id || listing.category_id || item.category_id || row.category_id)) return null;
       const picture = item.pictures?.[0] || row.pictures?.[0];
       const price = priceInReais(winner.price, winner.currency_id) ?? priceInReais(listing.price, listing.currency_id);
@@ -142,8 +194,8 @@ function registerBestsellers(app, authenticate, ensureToken) {
       try {
         const data = await get("/sites/MLB/search?" + params, token);
         const products = await Promise.all((data.results || []).filter(row => categoryId.test(row.id) && row.title).map(async row => {
-          const listing = await get("/items/" + row.id, token).catch(() => null);
-          if (!hasStock(listing)) return null;
+          const listing = row.available_quantity != null ? row : await get("/items/" + row.id, token).catch(() => null);
+          if (!isBuyable(listing, listing === row)) return null;
           return {
           id: row.id, type: "ITEM", title: listing.title || row.title, image: listing.secure_thumbnail || row.thumbnail || null, freeShipping: listing.shipping?.free_shipping === true, url: listing.permalink,
           price: priceInReais(row.price, row.currency_id) ?? priceInReais(listing.price, listing.currency_id),
@@ -157,6 +209,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
         if (![401, 403, 404].includes(error.status)) throw error;
       }
       const products = await searchCatalog(term, category, token);
+      if (!products.length && Date.now() < cooldownUntil) throw limited(Math.ceil((cooldownUntil - Date.now()) / 1000));
       res.json({ products, source: "catalog" });
     } catch (error) {
       handleError(res, error);
@@ -174,10 +227,14 @@ function registerBestsellers(app, authenticate, ensureToken) {
     const item = await get("/" + endpoints[type] + "/" + id, token).catch(() => ({}));
     const picture = item.pictures?.[0];
     const winner = item.buy_box_winner;
-    const listingId = type === "ITEM" && /^MLB\d+$/.test(id) ? id : winner?.item_id;
+    let listingId = type === "ITEM" && categoryId.test(id) ? id : winner?.item_id;
+    if (!listingId && type === "USER_PRODUCT" && /^\d+$/.test(item.user_id)) {
+      const linked = await get("/users/" + item.user_id + "/items/search?status=active&limit=3&user_product_id=" + id, token).catch(() => null);
+      listingId = linked?.results?.find(value => categoryId.test(value));
+    }
     if (!categoryId.test(listingId)) return null;
     const listing = type === "ITEM" ? item : await get("/items/" + listingId, token).catch(() => null);
-    if (!hasStock(listing)) return null;
+    if (!isBuyable(listing)) return null;
     const sale = lookupPrice && priceInReais(listing.price, listing.currency_id) === null
       ? await get("/items/" + listingId + "/sale_price?context=channel_marketplace", token).catch(() => null)
       : null;
@@ -225,7 +282,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
     const listings = new Set();
     for (let i = 0; i < ordered.length && products.length < 100; i += 20) {
       const batch = await Promise.all(ordered.slice(i, i + 20).map(async entry => {
-        const row = await productDetails(entry, token);
+        const row = await productDetails(entry, token, false);
         return row?.title ? { ...row, category: entry.category } : null;
       }));
       for (const product of batch.filter(Boolean)) {
@@ -234,6 +291,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
         products.push(product);
       }
     }
+    if (!products.length && Date.now() < cooldownUntil) throw limited(Math.ceil((cooldownUntil - Date.now()) / 1000));
     return { products: products.slice(0, 100), updatedAt: new Date().toISOString() };
   }
 
@@ -275,7 +333,8 @@ function registerBestsellers(app, authenticate, ensureToken) {
     try {
       const token = await ensureToken();
       const ranking = await categoryRanking(category, token);
-      const products = await Promise.all(ranking.map(entry => productDetails(entry, token)));
+      const products = await Promise.all(ranking.map(entry => productDetails(entry, token, false)));
+      if (!products.some(Boolean) && Date.now() < cooldownUntil) throw limited(Math.ceil((cooldownUntil - Date.now()) / 1000));
       res.json({ products: products.filter(Boolean).sort((a, b) => a.position - b.position) });
     } catch (error) {
       if (error.status === 404) return res.json({ products: [] });
