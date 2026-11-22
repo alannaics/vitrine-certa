@@ -209,7 +209,7 @@ app.get("/api/v2/clicks",requireDashboardToken,async(_req,res)=>{
 });
 app.get("/api/v2/manual-offers", async (_req,res) => {
  if(!db)return res.json({offers:[],configured:false});
- try{const q=await db.query("SELECT id,title,price,image_url,affiliate_url,category,created_at FROM affiliate_offers WHERE published=TRUE ORDER BY created_at DESC LIMIT 100");res.json({offers:q.rows,configured:true});}
+ try{const q=await db.query("SELECT id,title,price,image_url,category,created_at FROM affiliate_offers WHERE published=TRUE ORDER BY created_at DESC LIMIT 100");res.json({offers:q.rows,configured:true});}
  catch(e){res.status(503).json({error:"Catálogo indisponível."});}
 });
 app.get("/api/v2/manual-offers/manage",requireDashboardToken,async(_req,res)=>{
