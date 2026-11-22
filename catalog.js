@@ -18,7 +18,7 @@ function registerCatalog(app,ensureToken){
    url.search=new URLSearchParams({q,limit:String(limit),offset:String((page-1)*limit)}).toString();
    const headers={Accept:"application/json","User-Agent":"VitrineCerta/1.0"};
    if(token)headers.Authorization="Bearer "+token;
-   let response=await fetch(url,{headers});
+   let response=await fetch(url,{headers,signal:AbortSignal.timeout(12000)});
    if((response.status===401||response.status===403)&&token){delete headers.Authorization;response=await fetch(url,{headers})}
    const data=await response.json().catch(()=>({}));
    if(!response.ok)return res.status(response.status===401||response.status===403?response.status:502).json({error:authIssue?"A conexão Mercado Livre precisa ser corrigida: "+authIssue+"; a busca pública também foi recusada (HTTP "+response.status+").":"A API do Mercado Livre recusou a busca (HTTP "+response.status+").",upstreamStatus:response.status});
@@ -34,7 +34,7 @@ function registerCatalog(app,ensureToken){
    if(cache.size>120)cache.clear();
    cache.set(key,{time:Date.now(),payload});
    res.json(payload);
-  }catch(e){console.error("[catalog]",e.message);res.status(e.status===401?401:502).json({error:"Não foi possível carregar o catálogo: "+e.message})}
+  }catch(e){console.error("[catalog]",e.message);res.status(e.status===401?401:502).json({error:e.name==="TimeoutError"?"O Mercado Livre demorou para responder. Tente novamente em instantes.":"Não foi possível carregar o catálogo: "+e.message})}
  });
 }
 module.exports={registerCatalog};
