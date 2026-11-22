@@ -351,6 +351,24 @@ app.get("/api/mercadolivre/products", async (req, res) => {
   }
 });
 
+// Resolve a specific Mercado Livre listing rather than guessing offer details from catalog search.
+app.get("/api/mercadolivre/listing", async (req,res) => {
+ try {
+  const raw=String(req.query.url||"").trim().slice(0,1200);
+  let url;try{url=new URL(raw)}catch{return res.status(400).json({error:"Cole o endereço completo de um anúncio do Mercado Livre."})}
+  const host=url.hostname.toLowerCase();
+  if(!(/(^|\\.)mercadolivre\\.com\\.br$|(^|\\.)mercadolibre\\.com(\\.br)?$/.test(host)))return res.status(400).json({error:"Use somente links oficiais do Mercado Livre."});
+  const match=(url.pathname+url.search).match(/MLB-?(\\d{6,})/i);
+  if(!match)return res.status(422).json({error:"O link não contém um código de anúncio MLB. Abra um anúncio individual e copie o endereço."});
+  const id="MLB"+match[1],token=await ensureMlToken();
+  const response=await fetch("https://api.mercadolibre.com/items/"+encodeURIComponent(id),{headers:{Authorization:"Bearer "+token,Accept:"application/json"},signal:AbortSignal.timeout(12000)});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)return res.status(response.status===404?404:502).json({error:"Não foi possível consultar este anúncio. HTTP "+response.status});
+  const picture=data.pictures?.find(p=>p.secure_url||p.url);
+  const thumbnail=picture?.secure_url||picture?.url||data.secure_thumbnail||data.thumbnail||"";
+  return res.json({product:{id:data.id,title:data.title||"Produto",price:Number.isFinite(Number(data.price))?Number(data.price):null,thumbnail:thumbnail.replace(/^http:\/\//,"https://"),permalink:data.permalink||raw,freeShipping:!!data.shipping?.free_shipping,available:data.status==="active"&&Number(data.available_quantity)>0,listing_status:data.status||null,resultType:"active",_market:"Mercado Livre",availabilityVerified:true},source:"Mercado Livre /items"});
+ }catch(e){console.error("[ml-listing]",e.message);return res.status(502).json({error:e.name==="TimeoutError"?"A consulta demorou demais. Tente novamente.":"Não foi possível consultar o anúncio."})}
+});
 app.post("/api/affiliate/inspect", requireDashboardToken, async (req, res) => {
   try {
     const link = String(req.body?.link || "").trim();
