@@ -852,4 +852,33 @@ if(!document.body.classList.contains("vc-embedded")){
  const section=new URLSearchParams(location.search).get("page");
  if(section&&document.querySelector('#nav button[data-page="'+section.replace(/[^a-z]/g,"")+'"]'))showPage(section);
 })();
+</script><style id="vc-direct-listing-style">.vc-link-import{margin:16px 0;padding:16px;border:1px solid #e5e1fa;border-radius:15px;background:#faf9ff}.vc-link-import h3{font-size:15px;margin:0 0 6px;color:#242844}.vc-link-import p{font-size:12px;color:#778198;margin:0 0 12px}.vc-link-import form{display:flex;gap:8px;flex-wrap:wrap}.vc-link-import input{flex:1 1 240px;min-width:0;border:1px solid #dddfea;border-radius:10px;padding:12px;font-size:13px}.vc-link-import button{border:0;border-radius:10px;padding:12px 16px;background:#6857e9;color:#fff;font-weight:700}.vc-link-result{display:flex;gap:14px;align-items:center;margin-top:12px}.vc-link-result img{width:110px;height:110px;object-fit:contain;background:white;border-radius:10px}.vc-link-result strong{display:block;font-size:13px}.vc-link-result small{display:block;margin:7px 0;color:#666}.vc-link-result a{font-size:12px;color:#6151d6}@media(max-width:600px){.vc-link-import{padding:12px}.vc-link-result img{width:85px;height:85px}}</style>
+<script id="vc-direct-listing">
+(function(){
+const init=()=>{
+ const search=document.getElementById("discoveryProductQuery");if(!search||document.getElementById("vcLinkImport"))return;
+ const section=search.closest(".card")||search.closest("section")||search.parentElement.parentElement.parentElement;
+ const box=document.createElement("div");box.id="vcLinkImport";box.className="vc-link-import";
+ const heading=document.createElement("h3");heading.textContent="Adicionar anúncio com foto e preço";
+ const intro=document.createElement("p");intro.textContent="Cole o link de um anúncio individual do Mercado Livre para consultar os dados reais.";
+ const form=document.createElement("form");const input=document.createElement("input");input.type="url";input.required=true;input.placeholder="https://www.mercadolivre.com.br/...";input.setAttribute("aria-label","Link do anúncio Mercado Livre");
+ const button=document.createElement("button");button.type="submit";button.textContent="Consultar anúncio";
+ const message=document.createElement("div");message.setAttribute("role","status");message.style.marginTop="10px";
+ form.append(input,button);box.append(heading,intro,form,message);
+ section.append(box);
+ form.addEventListener("submit",async e=>{
+ e.preventDefault();button.disabled=true;button.textContent="Consultando...";message.replaceChildren();
+ try{
+ const response=await fetch("/api/mercadolivre/listing?url="+encodeURIComponent(input.value.trim()),{cache:"no-store"});
+ const data=await response.json();if(!response.ok)throw Error(data.error||"Não foi possível consultar o anúncio");
+ const p=data.product;const row=document.createElement("div");row.className="vc-link-result";
+ if(p.thumbnail){const img=document.createElement("img");img.src=p.thumbnail;img.alt=p.title;img.onerror=()=>img.remove();row.append(img)}
+ const details=document.createElement("div");const name=document.createElement("strong");name.textContent=p.title;const price=document.createElement("small");price.textContent=p.price==null?"Preço indisponível":p.price.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+ const link=document.createElement("a");link.href=p.permalink;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Conferir anúncio";
+ const saveBtn=document.createElement("button");saveBtn.type="button";saveBtn.textContent="Salvar no catálogo";saveBtn.style.marginLeft="10px";saveBtn.onclick=()=>{window.discoveryProductResults=[p,...(window.discoveryProductResults||[])];saveDiscoveryProduct(0)};
+ details.append(name,price,link,saveBtn);row.append(details);message.append(row);
+ }catch(error){message.textContent=error.message}finally{button.disabled=false;button.textContent="Consultar anúncio"}
+ });
+};if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
+})();
 </script></body></html>
