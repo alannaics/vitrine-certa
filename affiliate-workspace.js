@@ -102,7 +102,10 @@ function rankingCard(product, category) {
   rank.textContent = product.position ? product.position + "º no ranking oficial" : "";
   const title = document.createElement("strong");
   title.textContent = product.title || product.id + " · detalhes indisponíveis";
-  if (product.position) body.append(rank);
+  if (product.position) {
+    if (product.category) rank.textContent += " · " + product.category;
+    body.append(rank);
+  }
   body.append(title);
   if (product.price != null) {
     const price = document.createElement("div");
@@ -145,9 +148,10 @@ function rankingCard(product, category) {
     create.type = "button";
     create.textContent = "Criar conteúdo";
     create.onclick = () => {
-      selectedProduct = { ...product, category };
+      selectedProduct = { ...product, category: product.category || category };
       $("creativeProduct").value = product.title;
       $("creativePrice").value = product.price ?? "";
+      refreshCreativePrice(selectedProduct);
       $("creativeLink").value = savedLink(product.id);
       $("creativeImage").value = imageUrl;
       $("openSavedDrafts").hidden = true;
@@ -162,6 +166,24 @@ function rankingCard(product, category) {
   return card;
 }
 
+async function refreshCreativePrice(product) {
+  const input = $("creativePrice");
+  const status = $("creativePriceStatus");
+  status.textContent = "";
+  if (input.value || !product.type || !authToken) return;
+  status.textContent = "Consultando o preço do anúncio…";
+  try {
+    const { price } = await request("/api/mercadolivre/selection-price?id=" + encodeURIComponent(product.id) + "&type=" + encodeURIComponent(product.type));
+    if (selectedProduct !== product) return;
+    if (price > 0 && !input.value) input.value = price.toFixed(2);
+  } catch {
+    if (selectedProduct !== product) return;
+  }
+  if (selectedProduct === product) status.textContent = input.value
+    ? "Confira o valor no anúncio antes de divulgar."
+    : "Você pode gerar conteúdo sem citar preço. O público confere o valor no anúncio.";
+}
+
 async function loadRanking() {
   const current = ++rankingVersion;
   rankingCards.replaceChildren();
@@ -173,8 +195,7 @@ async function loadRanking() {
       const { categories } = await request("/api/mercadolivre/categories");
       if (current !== rankingVersion) return;
       if (!categories.length) throw Error("O Mercado Livre não retornou categorias.");
-      const first = categories.find(entry => entry.id === "MLB1051") || categories[0];
-      categorySelect(categories, "Categoria", first.id);
+      categorySelect(categories, "Categoria");
     }
     const selection = [...categoryPath.querySelectorAll("select")].findLast(select => select.value);
     const category = encodeURIComponent(selection?.value || "");
@@ -187,6 +208,13 @@ async function loadRanking() {
         categorySelect(detail.categories, "Escolher subcategoria");
       }
     }).catch(() => {});
+    if (!term && !category) {
+      const { products } = await request("/api/mercadolivre/selection");
+      if (current !== rankingVersion) return;
+      rankingStatus.textContent = products.length + " produtos para trabalhar · Seleção dos mais vendidos por categoria";
+      rankingCards.append(...products.map(product => rankingCard(product, product.category)));
+      return;
+    }
     if (ranked && !category) throw Error("Escolha uma categoria para consultar o ranking oficial.");
     const path = ranked ? "/api/mercadolivre/bestsellers?category=" + category
       : "/api/mercadolivre/search?q=" + encodeURIComponent(term) + (category ? "&category=" + category : "");
@@ -227,6 +255,16 @@ categoryPath.onchange = ({ target }) => {
   loadRanking();
 };
 $("rankingRefresh").onclick = loadRanking;
+$("showSelection").onclick = () => {
+  $("intelligenceTerm").value = "";
+  $("intelligenceSort").value = "relevance";
+  const root = categoryPath.querySelector("select");
+  if (root) {
+    root.value = "";
+    while (root.nextElementSibling) root.nextElementSibling.remove();
+  }
+  loadRanking();
+};
 $("intelligenceForm").onsubmit = event => {
   event.preventDefault();
   loadRanking();
@@ -255,6 +293,10 @@ $("creativeSaveDraft").onclick = async () => {
     status.textContent = "Cole o link HTTPS gerado na sua conta de afiliado do Mercado Livre.";
     return;
   }
+  if (!Number(data.price)) {
+    status.textContent = "Informe o preço conferido no anúncio para salvar uma oferta na vitrine. Para criar conteúdo, o preço é opcional.";
+    return;
+  }
   const button = $("creativeSaveDraft");
   button.disabled = true;
   status.textContent = "Salvando rascunho…";
@@ -281,7 +323,7 @@ $("creativeSaveDraft").onclick = async () => {
   }
 };
 
-$("creativeProduct").oninput = () => { selectedProduct = null; };
+$("creativeProduct").oninput = () => { selectedProduct = null; $("creativePriceStatus").textContent = ""; };
 $("creativeForm").onsubmit = async event => {
   event.preventDefault();
   const status = $("creativeStatus");
@@ -298,11 +340,11 @@ $("creativeForm").onsubmit = async event => {
     const data = Object.fromEntries(new FormData(event.currentTarget));
     data.link = data.link.trim();
     if (!officialLink(data.link)) throw Error("Cole o link HTTPS gerado na sua conta de afiliado do Mercado Livre.");
-    data.price = currency(data.price);
+    data.price = data.price ? currency(data.price) : "";
     if (selectedProduct) {
       try { localStorage.setItem("vcAffiliateLink:" + selectedProduct.id, data.link); } catch {}
     }
-    shareText = data.product + "\n" + data.price + " · preço sujeito a alteração\nLink de afiliado: " + data.link;
+    shareText = data.product + "\n" + (data.price ? data.price + " · preço sujeito a alteração" : "Confira o preço atual no anúncio") + "\nLink de afiliado: " + data.link;
     $("shareOffer").textContent = shareText;
     output.hidden = false;
     $("creativeText").textContent = "";

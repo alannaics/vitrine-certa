@@ -98,7 +98,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
       const apiPrice = price ?? (sale?.currency_id === "BRL" ? priceInReais(sale.amount, "BRL") : null);
       const publicPrice = apiPrice === null ? await publicCatalogPrice(row.id) : null;
       return {
-        id: row.id,
+        id: row.id, type: "PRODUCT",
         title: listing.title || item.name || row.name,
         image: picture?.secure_url || picture?.url || listing.secure_thumbnail || winner.thumbnail || null,
         price: apiPrice ?? publicPrice,
@@ -134,7 +134,7 @@ function registerBestsellers(app, authenticate, ensureToken) {
       try {
         const data = await get("/sites/MLB/search?" + params, token);
         const products = (data.results || []).filter(row => categoryId.test(row.id) && row.title).map(row => ({
-          id: row.id, title: row.title, image: row.thumbnail || null, url: row.permalink || null,
+          id: row.id, type: "ITEM", title: row.thumbnail || null, url: row.permalink || null,
           price: priceInReais(row.price, row.currency_id),
           originalPrice: priceInReais(row.original_price, row.currency_id),
           installments: installmentsInReais(row.installments)
@@ -150,6 +150,103 @@ function registerBestsellers(app, authenticate, ensureToken) {
     }
   });
 
+  async function categoryRanking(category, token) {
+    const ranking = await get("/highlights/MLB/category/" + category, token);
+    return (ranking.content || []).slice(0, 20).sort((a, b) => a.position - b.position);
+  }
+
+  async function productDetails(entry, token, lookupPrice = true) {
+    const { id, position, type } = entry;
+    if (!Object.hasOwn(endpoints, type) || !/^MLBU?\d+$/.test(id) || !Number.isInteger(position)) return null;
+    const item = await get("/" + endpoints[type] + "/" + id, token).catch(() => ({}));
+    const picture = item.pictures?.[0];
+    const winner = item.buy_box_winner;
+    const listingId = type === "ITEM" && /^MLB\d+$/.test(id) ? id : winner?.item_id;
+    const sale = lookupPrice && /^MLB\d+$/.test(listingId)
+      ? await get("/items/" + listingId + "/sale_price?context=channel_marketplace", token).catch(() => null)
+      : null;
+    const apiPrice = (sale?.currency_id === "BRL" ? priceInReais(sale.amount, "BRL") : null)
+      ?? priceInReais(item.price, item.currency_id) ?? priceInReais(winner?.price, winner?.currency_id);
+    const publicPrice = lookupPrice && apiPrice === null && type === "PRODUCT" ? await publicCatalogPrice(id) : null;
+    return {
+      id, position, type, title: item.title || item.name || null,
+      image: picture?.secure_url || picture?.url || item.secure_thumbnail || null,
+      price: apiPrice ?? publicPrice,
+      priceSource: publicPrice !== null ? "product-page" : null,
+      originalPrice: sale?.currency_id === "BRL" ? priceInReais(sale.regular_amount, "BRL") : priceInReais(item.original_price, item.currency_id),
+      installments: installmentsInReais(item.installments || winner?.installments),
+      url: item.permalink || (type === "PRODUCT" ? "https://www.mercadolivre.com.br/p/" + id : null)
+    };
+  }
+
+  const collectionCategories = [
+    "Beleza e Cuidado Pessoal", "Casa, Móveis e Decoração", "Calçados, Roupas e Bolsas",
+    "Eletrônicos, Áudio e Vídeo", "Esportes e Fitness", "Celulares e Telefones", "Ferramentas"
+  ];
+  let selectionCache = null;
+  let pendingSelection = null;
+
+  async function buildSelection(token) {
+    const categories = (await get("/sites/MLB/categories", token))
+      .filter(category => collectionCategories.includes(category.name) && categoryId.test(category.id));
+    const lists = await Promise.all(categories.map(async category => {
+      try {
+        const entries = await categoryRanking(category.id, token);
+        return entries.map(entry => ({ ...entry, category: category.name }));
+      } catch {
+        return [];
+      }
+    }));
+    const candidates = new Map();
+    for (let position = 0; position < 20; position++) {
+      for (const list of lists) {
+        const entry = list[position];
+        if (entry && !candidates.has(entry.id)) candidates.set(entry.id, entry);
+      }
+    }
+    const products = [];
+    const ordered = [...candidates.values()];
+    for (let i = 0; i < ordered.length && products.length < 100; i += 20) {
+      const batch = await Promise.all(ordered.slice(i, i + 20).map(async entry => {
+        const row = await productDetails(entry, token, false);
+        return row?.title ? { ...row, category: entry.category } : null;
+      }));
+      products.push(...batch.filter(Boolean));
+    }
+    if (!products.length) throw Error("Nenhum ranking de categoria retornou produtos agora.");
+    return { products: products.slice(0, 100), updatedAt: new Date().toISOString() };
+  }
+
+  app.get("/api/mercadolivre/selection", authenticate, async (_req, res) => {
+    if (selectionCache && Date.now() - Date.parse(selectionCache.updatedAt) < 10 * 60 * 1000) {
+      return res.json(selectionCache);
+    }
+    try {
+      if (!pendingSelection) {
+        pendingSelection = ensureToken().then(buildSelection).then(result => {
+          selectionCache = result;
+          return result;
+        }).finally(() => { pendingSelection = null; });
+      }
+      res.json(await pendingSelection);
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
+  app.get("/api/mercadolivre/selection-price", authenticate, async (req, res) => {
+    const { id, type } = req.query;
+    if (typeof id !== "string" || !/^MLBU?\d+$/.test(id) || typeof type !== "string" || !Object.hasOwn(endpoints, type)) {
+      return res.status(400).json({ error: "Identificação do produto inválida." });
+    }
+    try {
+      const row = await productDetails({ id, type, position: 0 }, await ensureToken());
+      res.json({ price: row?.price ?? null });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
   app.get("/api/mercadolivre/bestsellers", authenticate, async (req, res) => {
     const category = req.query.category;
     if (typeof category !== "string" || !categoryId.test(category)) {
@@ -157,30 +254,8 @@ function registerBestsellers(app, authenticate, ensureToken) {
     }
     try {
       const token = await ensureToken();
-      const ranking = await get("/highlights/MLB/category/" + category, token);
-      const products = await Promise.all((ranking.content || []).slice(0, 20).map(async entry => {
-        const { id, position, type } = entry;
-        if (!Object.hasOwn(endpoints, type) || !/^MLBU?\d+$/.test(id) || !Number.isInteger(position)) return null;
-        const item = await get("/" + endpoints[type] + "/" + id, token).catch(() => ({}));
-        const picture = item.pictures?.[0];
-        const winner = item.buy_box_winner;
-        const listingId = type === "ITEM" && /^MLB\d+$/.test(id) ? id : winner?.item_id;
-        const sale = /^MLB\d+$/.test(listingId)
-          ? await get("/items/" + listingId + "/sale_price?context=channel_marketplace", token).catch(() => null)
-          : null;
-        const apiPrice = (sale?.currency_id === "BRL" ? priceInReais(sale.amount, "BRL") : null)
-          ?? priceInReais(item.price, item.currency_id) ?? priceInReais(winner?.price, winner?.currency_id);
-        const publicPrice = apiPrice === null && type === "PRODUCT" ? await publicCatalogPrice(id) : null;
-        return {
-          id, position, title: item.title || item.name || null,
-          image: picture?.secure_url || picture?.url || item.secure_thumbnail || null,
-          price: apiPrice ?? publicPrice,
-          priceSource: publicPrice !== null ? "product-page" : null,
-          originalPrice: sale?.currency_id === "BRL" ? priceInReais(sale.regular_amount, "BRL") : priceInReais(item.original_price, item.currency_id),
-          installments: installmentsInReais(item.installments || winner?.installments),
-          url: item.permalink || (type === "PRODUCT" ? "https://www.mercadolivre.com.br/p/" + id : null)
-        };
-      }));
+      const ranking = await categoryRanking(category, token);
+      const products = await Promise.all(ranking.map(entry => productDetails(entry, token)));
       res.json({ products: products.filter(Boolean).sort((a, b) => a.position - b.position) });
     } catch (error) {
       if (error.status === 404) return res.json({ products: [] });

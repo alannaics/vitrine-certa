@@ -31,11 +31,11 @@
 
 <section class="section active" id="discover">
   <div class="panel">
-    <div class="panelhead"><h2>Produtos do Mercado Livre</h2></div>
+    <div class="panelhead"><h2>Produtos para trabalhar</h2></div>
     <form id="intelligenceForm" class="workspace-controls">
       <label>Palavra-chave<input class="field" name="term" id="intelligenceTerm" maxlength="100" placeholder="Ex.: fone bluetooth"></label>
       <label>Ordenar por<select class="field" id="intelligenceSort"><option value="relevance">Relevância</option><option value="bestsellers">Mais vendidos</option><option value="priceAsc">Menor preço</option><option value="priceDesc">Maior preço</option></select></label>
-      <button type="submit" class="btn">Pesquisar</button>
+      <button type="submit" class="btn">Pesquisar</button><button type="button" class="btn secondary" id="showSelection">Ver seleção automática</button>
     </form>
     <div class="workspace-controls">
       <div class="category-path" id="categoryPath"></div>
@@ -53,8 +53,8 @@
       <div class="formgrid">
         <label>Produto<input class="field" id="creativeProduct" name="product" maxlength="500" required></label>
         <label>Formato<select class="field" name="format"><option>Vídeo curto para Instagram Reels</option><option>Vídeo curto para TikTok</option><option>Vídeo curto para YouTube Shorts</option></select></label>
-        <label>Preço em reais<input class="field" id="creativePrice" name="price" type="number" min="0.01" step="0.01" required></label>
-        <label>Seu link oficial de afiliado<input class="field" id="creativeLink" name="link" type="url" maxlength="1000" required></label>
+        <label>Preço em reais (opcional para o conteúdo)<input class="field" id="creativePrice" name="price" type="number" min="0.01" step="0.01"></label>
+        <p id="creativePriceStatus" class="muted" role="status"></p><label>Seu link oficial de afiliado<input class="field" id="creativeLink" name="link" type="url" maxlength="1000" required></label>
       </div>
       <label>URL da imagem (opcional)<input class="field" id="creativeImage" name="image" type="url" maxlength="2000" placeholder="https://…"></label>
       <p class="muted workspace-note">Gere seu link para o produto na <a href="https://www.mercadolivre.com.br/l/afiliados-gere-seus-links" target="_blank" rel="noopener noreferrer">Central de Afiliados</a> e cole aqui. Confira o preço no anúncio antes de divulgar. <a href="https://www.mercadolivre.com.br/afiliados" target="_blank" rel="noopener noreferrer">Abrir Central de Afiliados ML</a>.</p>
@@ -120,4 +120,4 @@ $("importLinks").onclick=async()=>{if(!authToken){message("Valide o token admini
 $("verifyToken").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token.",true);return}try{await request("/api/automation/readiness");$("integrationState").textContent="Token validado. Seu acesso está disponível nesta aba.";sessionStorage.setItem("vcDashboardToken",authToken);message("Acesso administrativo validado.");await Promise.all([loadAdmin(),loadDrafts(),loadRanking(),loadCommissions()])}catch(e){$("integrationState").textContent=e.message;message(e.message,true)}};
 $("connectMl").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token administrativo.",true);return}try{const d=await request("/api/mercadolivre/auth-url",{method:"POST",body:"{}"});if(d.authorizationUrl)location.assign(d.authorizationUrl)}catch(e){message(e.message,true)}};
 loadOffers();loadStatus();
-</script><script src="/affiliate-workspace.js?v=price-layout"></script></body></html>
+</script><script src="/affiliate-workspace.js?v=automatic-selection"></script></body></html>
