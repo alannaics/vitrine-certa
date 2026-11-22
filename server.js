@@ -3,11 +3,13 @@ const crypto = require("node:crypto");
 const path = require("node:path");
 const { Pool } = require("pg");
 const { registerFinance, initializeFinance } = require("./finance");
+const { registerCatalog } = require("./catalog");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.get("/finance", (_req, res) => res.sendFile(path.join(__dirname, "finance.html")));
+app.get("/catalog", (_req, res) => res.sendFile(path.join(__dirname, "catalog.html")));
 
 const PORT = process.env.PORT || 3000;
 const APP_ID = process.env.SHOPEE_APP_ID;
@@ -167,6 +169,7 @@ async function ensureMlToken() {
   return mlAccessToken;
 }
 
+registerCatalog(app, ensureMlToken);
 app.get("/api/status", (_req, res) => {
   res.json({
     database: { configured: Boolean(db) },
@@ -525,7 +528,7 @@ app.get("/oauth/mercadolivre/callback", async (req, res) => {
     mlRefreshToken = data.refresh_token;
     mlTokenExpiresAt = Date.now() + Number(data.expires_in || 21600) * 1000;
     await saveMlTokens();
-    res.type("html").send("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Mercado Livre conectado</title><body style='font:16px system-ui;max-width:560px;margin:12vh auto;padding:24px;color:#28232a'><h2>Autorização recebida</h2><p>O Mercado Livre foi conectado ao Vitrine Certa nesta sessão do servidor.</p><p>Volte ao painel para verificar o status. No plano gratuito, uma reinicialização pode exigir nova autorização.</p><a href='/'>Voltar ao Vitrine Certa</a></body></html>");
+    res.type("html").send("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Mercado Livre conectado</title><body style='font:16px system-ui;max-width:560px;margin:12vh auto;padding:24px;color:#28232a'><h2>Autorização recebida</h2><p>O Mercado Livre foi conectado à Vitrine Certa. A autorização é armazenada de forma criptografada no banco quando ele está configurado.</p><p>Volte ao painel para verificar o status. A conexão será renovada automaticamente enquanto a autorização continuar válida.</p><a href='/'>Voltar ao Vitrine Certa</a></body></html>");
   } catch (e) { res.status(e.status || 500).send("Não foi possível concluir a conexão: " + String(e.message)); }
 });
 
