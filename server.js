@@ -315,6 +315,19 @@ app.post("/api/v2/manual-offers",requireDashboardToken,async(req,res)=>{
  try{const q=await db.query("INSERT INTO affiliate_offers(title,price,image_url,affiliate_url,category,published) VALUES($1,$2,$3,$4,$5,$6) RETURNING id",[title,price,image||null,link,category,req.body?.published===true]);res.status(201).json({id:q.rows[0].id});}
  catch{res.status(500).json({error:"Falha ao salvar."});}
 });
+app.patch("/api/v2/manual-offers/:id",requireDashboardToken,async(req,res)=>{
+ if(!db)return res.status(503).json({error:"Banco não configurado."});
+ if(!/^\d+$/.test(req.params.id))return res.status(400).json({error:"ID inválido."});
+ const updates=[];const params=[];
+ const add=(field,value)=>{params.push(value);updates.push(field+"=$"+params.length);};
+ if(typeof req.body?.published==="boolean")add("published",req.body.published);
+ if(req.body?.price!==undefined){const p=Number(req.body.price);if(!Number.isFinite(p)||p<=0||p>1000000)return res.status(400).json({error:"Preço inválido."});add("price",p);}
+ if(req.body?.title!==undefined){const t=String(req.body.title).trim().slice(0,180);if(!t)return res.status(400).json({error:"Título inválido."});add("title",t);}
+ if(!updates.length)return res.status(400).json({error:"Nenhuma alteração válida."});
+ params.push(req.params.id);
+ try{const q=await db.query("UPDATE affiliate_offers SET "+updates.join(",")+" WHERE id=$"+params.length+" RETURNING id,published,title,price",params);res.status(q.rowCount?200:404).json(q.rows[0]||{error:"Oferta não encontrada."});}
+ catch{res.status(500).json({error:"Não foi possível atualizar."});}
+});
 app.delete("/api/v2/manual-offers/:id",requireDashboardToken,async(req,res)=>{
  if(!db)return res.status(503).json({error:"Banco não configurado."});
  if(!/^\d+$/.test(req.params.id))return res.status(400).json({error:"ID inválido."});
