@@ -137,6 +137,7 @@ async function initializeDatabase() {
   if (!db) return;
   await initializeFinance(db);
   await db.query("CREATE TABLE IF NOT EXISTS affiliate_offers (id BIGSERIAL PRIMARY KEY,title TEXT NOT NULL,price NUMERIC(12,2) NOT NULL,image_url TEXT,affiliate_url TEXT NOT NULL,category TEXT NOT NULL DEFAULT 'geral',published BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+  await db.query("CREATE TABLE IF NOT EXISTS affiliate_clicks (id BIGSERIAL PRIMARY KEY,offer_id BIGINT NOT NULL REFERENCES affiliate_offers(id) ON DELETE CASCADE,clicked_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS app_secrets (secret_name TEXT PRIMARY KEY, secret_value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS dashboard_state (id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1), state JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await db.query("CREATE TABLE IF NOT EXISTS saved_campaigns (id TEXT PRIMARY KEY, product_name TEXT NOT NULL, format TEXT, content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
@@ -269,6 +270,28 @@ app.get("/api/shopee/products", requireDashboardToken, async (req, res) => {
 
 // Public affiliate storefront: only offers supplied with attribution links by the official partner API.
 
+
+// Track outbound traffic without cookies, IP addresses, or personal identifiers.
+app.get("/go/:id", async(req,res)=>{
+ if(!db || !/^\d+$/.test(req.params.id))return res.status(404).send("Oferta indisponível.");
+ try{
+  const q=await db.query("SELECT affiliate_url FROM affiliate_offers WHERE id=$1 AND published=TRUE",[req.params.id]);
+  if(!q.rowCount)return res.status(404).send("Oferta indisponível.");
+  const target=new URL(q.rows[0].affiliate_url);
+  if(target.protocol!=="https:")return res.status(400).send("Destino inválido.");
+  db.query("INSERT INTO affiliate_clicks(offer_id) VALUES($1)",[req.params.id]).catch(e=>console.error("[click tracking]",e.message));
+  res.set("Cache-Control","no-store");
+  return res.redirect(302,target.toString());
+ }catch{return res.status(503).send("Oferta temporariamente indisponível.");}
+});
+app.get("/api/v2/clicks",requireDashboardToken,async(_req,res)=>{
+ if(!db)return res.status(503).json({error:"Banco não configurado."});
+ try{
+  const q=await db.query("SELECT o.id,o.title,COUNT(c.id)::int AS clicks FROM affiliate_offers o LEFT JOIN affiliate_clicks c ON c.offer_id=o.id GROUP BY o.id,o.title ORDER BY clicks DESC LIMIT 100");
+  const total=q.rows.reduce((n,r)=>n+r.clicks,0);
+  res.json({totalClicks:total,offers:q.rows,notice:"Cliques não representam vendas nem comissões."});
+ }catch{res.status(503).json({error:"Relatório indisponível."});}
+});
 app.get("/api/v2/manual-offers", async (_req,res) => {
  if(!db)return res.json({offers:[],configured:false});
  try{const q=await db.query("SELECT id,title,price,image_url,affiliate_url,category,created_at FROM affiliate_offers WHERE published=TRUE ORDER BY created_at DESC LIMIT 100");res.json({offers:q.rows,configured:true});}
