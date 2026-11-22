@@ -8,7 +8,7 @@ const { registerCatalog } = require("./catalog");
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 // Public assets are explicitly allowlisted; secrets and server source are never exposed.
-const publicAssets = new Set(["studio.css", "studio-pages.css", "studio-shell.css", "studio-shell.js"]);
+const publicAssets = new Set(["studio.css", "studio-pages.css", "studio-shell.css", "studio-shell.js", "catalog-tools.js"]);
 app.get("/:asset", (req, res, next) => {
   if (!publicAssets.has(req.params.asset)) return next();
   res.set("Cache-Control", "public, max-age=300");
