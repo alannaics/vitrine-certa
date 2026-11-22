@@ -19,17 +19,22 @@
 .chart-fill { height:100%; background:#545be9; border-radius:6px; }
 #commissionChart .chart-fill { background:#16806b; }
 </style></head><body>
-<aside><div class="brand">◈ vitrine<b>certa.</b></div><nav id="nav"><button data-tab="discover" class="active">▦ Mais vendidos</button><button data-tab="creative">✧ Criar conteúdo</button><button data-tab="insights">▤ Resultados</button><button data-tab="catalog">◫ Ofertas</button><button data-tab="overview">◫ Visão geral</button><button data-tab="settings">⚙ Integrações</button></nav><div class="asidefoot">Affiliate OS · Mercado Livre</div></aside>
-<div class="app"><header class="top"><strong>Workspace / <span id="crumb">Mais vendidos</span></strong><small>Operação comercial · Brasil</small></header><main class="wrap">
-<div class="hero"><div><div class="eyebrow">Central de operação</div><h1 id="heading">Mais vendidos</h1><div class="muted" id="subheading">Ranking oficial do Mercado Livre por categoria.</div></div><div class="actions"><button class="btn secondary" id="reload">↻ Atualizar</button><button class="btn" id="newOffer">+ Nova oferta</button></div></div>
+<aside><div class="brand">◈ vitrine<b>certa.</b></div><nav id="nav"><button data-tab="discover" class="active">▦ Inteligência / Busca</button><button data-tab="creative">✧ Criar conteúdo</button><button data-tab="insights">▤ Resultados</button><button data-tab="catalog">◫ Ofertas</button><button data-tab="overview">◫ Visão geral</button><button data-tab="settings">⚙ Integrações</button></nav><div class="asidefoot">Affiliate OS · Mercado Livre</div></aside>
+<div class="app"><header class="top"><strong>Workspace / <span id="crumb">Inteligência / Busca</span></strong><small>Operação comercial · Brasil</small></header><main class="wrap">
+<div class="hero"><div><div class="eyebrow">Central de operação</div><h1 id="heading">Inteligência / Busca</h1><div class="muted" id="subheading">Pesquise produtos e abra o anúncio no Mercado Livre.</div></div><div class="actions"><button class="btn secondary" id="reload">↻ Atualizar</button><button class="btn" id="newOffer">+ Nova oferta</button></div></div>
 <div id="msg" role="status" aria-live="polite"></div>
 
 <section class="section active" id="discover">
   <div class="panel">
-    <div class="panelhead"><h2>Top 20 por categoria</h2></div>
+    <div class="panelhead"><h2>Produtos do Mercado Livre</h2></div>
+    <form id="intelligenceForm" class="workspace-controls">
+      <label>Palavra-chave<input class="field" name="term" id="intelligenceTerm" maxlength="100" placeholder="Ex.: fone bluetooth"></label>
+      <label>Ordenar por<select class="field" id="intelligenceSort"><option value="relevance">Relevância</option><option value="bestsellers">Mais vendidos</option><option value="priceAsc">Menor preço</option><option value="priceDesc">Maior preço</option></select></label>
+      <button type="submit" class="btn">Pesquisar</button>
+    </form>
     <div class="workspace-controls">
       <div class="category-path" id="categoryPath"></div>
-      <button type="button" class="btn secondary" id="rankingRefresh">Atualizar ranking</button>
+      <button type="button" class="btn secondary" id="rankingRefresh">Atualizar resultados</button>
       <button type="button" class="btn secondary" id="rankingAccess">Validar acesso</button>
     </div>
     <p class="muted workspace-status" id="rankingStatus" role="status">Valide o acesso administrativo em Integrações.</p>
@@ -46,7 +51,7 @@
         <label>Seu link oficial de afiliado<input class="field" id="creativeLink" name="link" type="url" maxlength="1000" required></label>
       </div>
       <label>URL da imagem (opcional)<input class="field" id="creativeImage" name="image" type="url" maxlength="2000" placeholder="https://…"></label>
-      <p class="muted workspace-note">Gere seu link para o produto na <a href="https://www.mercadolivre.com.br/l/afiliados-gere-seus-links" target="_blank" rel="noopener noreferrer">Central de Afiliados</a> e cole aqui. Confira o preço no anúncio antes de divulgar.</p>
+      <p class="muted workspace-note">Gere seu link para o produto na <a href="https://www.mercadolivre.com.br/l/afiliados-gere-seus-links" target="_blank" rel="noopener noreferrer">Central de Afiliados</a> e cole aqui. Confira o preço no anúncio antes de divulgar. <a href="https://www.mercadolivre.com.br/afiliados" target="_blank" rel="noopener noreferrer">Abrir Central de Afiliados ML</a>.</p>
       <label>Informações verificadas sobre o produto (opcional)<textarea class="field" name="details" rows="3" maxlength="1000"></textarea></label>
       <div class="actions"><button class="btn" id="creativeGenerate" type="submit">Gerar pacote com Gemini</button><button class="btn secondary" id="creativeSaveDraft" type="button">Salvar oferta como rascunho</button><button class="btn secondary" id="creativeAccess" type="button">Validar acesso</button></div>
     </form>
@@ -89,7 +94,7 @@
 </div><div class="split"><div class="panel"><div class="eyebrow">Análise de desempenho</div><h2>Tráfego por oferta</h2><p class="muted">Métricas de cliques obtidas do próprio sistema, sem estimar vendas.</p><div id="clickRows" class="metriclist"><div class="empty">Informe o token administrativo em Integrações.</div></div></div><div class="panel"><div class="eyebrow">Inteligência comercial</div><h2>Estado da automação</h2><div id="readiness" class="metriclist"><div class="empty">Informe o token administrativo para verificar os bloqueios.</div></div><div class="notice">O acesso à API de vendedor e à busca de produtos não comprova participação nem atribuição no programa de afiliados.</div></div></div></section>
 <section class="section" id="settings"><div class="split"><div class="panel"><div class="eyebrow">Acesso protegido</div><h2>Administração</h2><p class="muted">Insira o token definido em DASHBOARD_API_TOKEN no Render. Ele é mantido somente nesta aba enquanto estiver aberta.</p><label>Token administrativo<input id="token" class="field" type="password" autocomplete="off" placeholder="Seu token do Render"></label><div class="actions"><button class="btn" id="verifyToken">Verificar conexão</button><button class="btn secondary" id="connectMl">Conectar Mercado Livre</button></div><div id="integrationState" class="notice">Nenhuma autenticação verificada nesta sessão.</div></div><div class="panel"><div class="eyebrow">Governança</div><h2>Pronto para comercializar?</h2><div class="steps"><div class="step"><i>✓</i><div><b>Base operacional</b><p>Catálogo próprio, redirecionamentos e contagem de cliques.</p></div></div><div class="step"><i>!</i><div><b>Receita real</b><p>Exige integração autorizada para conversões e comissões.</p></div></div><div class="step"><i>!</i><div><b>Produto SaaS</b><p>Antes de vender a plataforma: autenticação por usuário, isolamento de contas, auditoria, termos e privacidade.</p></div></div></div></div></div></section>
 </main></div><script>
-const $=id=>document.getElementById(id);let offers=[],authToken=sessionStorage.getItem("vcDashboardToken")||"";const tabs={discover:["Mais vendidos","Mais vendidos","Ranking oficial do Mercado Livre por categoria."],creative:["Criar conteúdo","Criar conteúdo","Roteiro, storyboard e legenda para o produto escolhido."],overview:["Visão geral","Seu negócio, em uma única visão.","Produtos, campanhas e resultados reais. Sem números inventados."],catalog:["Ofertas","Seu catálogo, pronto para crescer.","Produtos publicados com links de afiliado autorizados."],insights:["Resultados","Resultados","Cliques da vitrine, comissões recebidas e acesso às métricas oficiais."],settings:["Integrações","Conexões sob controle.","Credenciais protegidas e permissões verificáveis."]};
+const $=id=>document.getElementById(id);let offers=[],authToken=sessionStorage.getItem("vcDashboardToken")||"";const tabs={discover:["Inteligência / Busca","Inteligência / Busca","Pesquise produtos e abra o anúncio no Mercado Livre."],creative:["Criar conteúdo","Criar conteúdo","Roteiro, storyboard e legenda para o produto escolhido."],overview:["Visão geral","Seu negócio, em uma única visão.","Produtos, campanhas e resultados reais. Sem números inventados."],catalog:["Ofertas","Seu catálogo, pronto para crescer.","Produtos publicados com links de afiliado autorizados."],insights:["Resultados","Resultados","Cliques da vitrine, comissões recebidas e acesso às métricas oficiais."],settings:["Integrações","Conexões sob controle.","Credenciais protegidas e permissões verificáveis."]};
 function message(s,error=false){$("msg").textContent=s;$("msg").className=s?"notice"+(error?" error":""):""}
 function tab(name){document.querySelectorAll(".section").forEach(x=>x.classList.toggle("active",x.id===name));document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("active",x.dataset.tab===name));$("crumb").textContent=tabs[name][0];$("heading").textContent=tabs[name][1];$("subheading").textContent=tabs[name][2];message("")}
 document.querySelectorAll("#nav button").forEach(x=>x.addEventListener("click",()=>tab(x.dataset.tab)));
@@ -109,4 +114,4 @@ $("importLinks").onclick=async()=>{if(!authToken){message("Valide o token admini
 $("verifyToken").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token.",true);return}try{await request("/api/automation/readiness");$("integrationState").textContent="Token validado. Seu acesso está disponível nesta aba.";sessionStorage.setItem("vcDashboardToken",authToken);message("Acesso administrativo validado.");await Promise.all([loadAdmin(),loadDrafts(),loadRanking(),loadCommissions()])}catch(e){$("integrationState").textContent=e.message;message(e.message,true)}};
 $("connectMl").onclick=async()=>{authToken=$("token").value.trim();if(!authToken){message("Informe o token administrativo.",true);return}try{const d=await request("/api/mercadolivre/auth-url",{method:"POST",body:"{}"});if(d.authorizationUrl)location.assign(d.authorizationUrl)}catch(e){message(e.message,true)}};
 loadOffers();loadStatus();
-</script><script src="/affiliate-workspace.js?v=offer-launch"></script></body></html>
+</script><script src="/affiliate-workspace.js?v=search-intelligence"></script></body></html>

@@ -53,7 +53,7 @@ function categorySelect(categories, label, first = "") {
   const select = document.createElement("select");
   select.className = "field";
   select.setAttribute("aria-label", label);
-  if (!first) select.add(new Option(label, ""));
+  select.add(new Option(label === "Categoria" ? "Todas as categorias" : label, ""));
   for (const { id, name } of categories) select.add(new Option(name, id));
   select.value = first;
   categoryPath.append(select);
@@ -86,15 +86,27 @@ function rankingCard(product, category) {
   const body = document.createElement("div");
   body.className = "offerbody";
   const rank = document.createElement("small");
-  rank.textContent = product.position + "º no ranking";
+  rank.textContent = product.position ? product.position + "º no ranking oficial" : "";
   const title = document.createElement("strong");
   title.textContent = product.title || product.id + " · detalhes indisponíveis";
-  body.append(rank, title);
+  if (product.position) body.append(rank);
+  body.append(title);
   if (product.price != null) {
     const price = document.createElement("div");
     price.className = "price";
     price.textContent = currency(product.price);
     body.append(price);
+    if (product.originalPrice > product.price) {
+      const discount = document.createElement("small");
+      const percent = Math.round((1 - product.price / product.originalPrice) * 100);
+      discount.textContent = "De " + currency(product.originalPrice) + (percent > 0 ? " · " + percent + "% OFF" : "");
+      body.append(discount);
+    }
+    if (product.installments) {
+      const note = document.createElement("small");
+      note.textContent = product.installments.quantity + "× de " + currency(product.installments.amount);
+      body.append(note);
+    }
   }
   if (product.price == null && product.title) {
     const note = document.createElement("small");
@@ -147,18 +159,39 @@ async function loadRanking() {
       categorySelect(categories, "Categoria", first.id);
     }
     const selection = [...categoryPath.querySelectorAll("select")].findLast(select => select.value);
-    const category = encodeURIComponent(selection.value);
-    request("/api/mercadolivre/categories?parent=" + category).then(detail => {
+    const category = encodeURIComponent(selection?.value || "");
+    const categoryName = selection?.selectedOptions[0].text;
+    const term = $("intelligenceTerm").value.trim();
+    const sort = $("intelligenceSort").value;
+    const ranked = !term || sort === "bestsellers";
+    if (category) request("/api/mercadolivre/categories?parent=" + category).then(detail => {
       if (current === rankingVersion && detail.categories.length && !selection.nextElementSibling) {
         categorySelect(detail.categories, "Escolher subcategoria");
       }
     }).catch(() => {});
-    const { products } = await request("/api/mercadolivre/bestsellers?category=" + category);
+    if (ranked && !category) throw Error("Escolha uma categoria para consultar o ranking oficial.");
+    const path = ranked ? "/api/mercadolivre/bestsellers?category=" + category
+      : "/api/mercadolivre/search?q=" + encodeURIComponent(term) + (category ? "&category=" + category : "");
+    const response = await request(path);
     if (current !== rankingVersion) return;
+    let products = response.products;
+    if (ranked && term) {
+      const normalize = text => (text || "").toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+      const words = normalize(term).split(/\s+/);
+      products = products.filter(product => words.every(word => normalize(product.title).includes(word)));
+    }
+    if (sort === "priceAsc" || sort === "priceDesc") {
+      const direction = sort === "priceAsc" ? 1 : -1;
+      products.sort((a, b) => a.price == null ? Number(b.price != null)
+        : b.price == null ? -1 : direction * (a.price - b.price));
+    }
+    const source = ranked ? "Top 20 oficial · " + categoryName
+      : response.source === "catalog" ? "Catálogo do Mercado Livre" : "Busca do Mercado Livre";
     rankingStatus.textContent = products.length
-      ? selection.selectedOptions[0].text + " · " + products.length + " posições"
-      : "O Mercado Livre não retornou um ranking para esta categoria. Consulte uma subcategoria, se houver.";
-    rankingCards.append(...products.map(product => rankingCard(product, selection.selectedOptions[0].text)));
+      ? source + " · " + products.length + " resultado(s)" + (ranked && term ? " no ranking para esta palavra-chave" : "")
+      : ranked ? source + " · Nenhum produto encontrado. Tente outra palavra-chave ou subcategoria."
+      : source + " · Nenhum produto encontrado. Tente outra palavra-chave ou categoria.";
+    rankingCards.append(...products.map(product => rankingCard(product, categoryName)));
   } catch (error) {
     if (current === rankingVersion) rankingStatus.textContent = error.message;
   }
@@ -169,6 +202,11 @@ categoryPath.onchange = ({ target }) => {
   loadRanking();
 };
 $("rankingRefresh").onclick = loadRanking;
+$("intelligenceForm").onsubmit = event => {
+  event.preventDefault();
+  loadRanking();
+};
+$("intelligenceSort").onchange = loadRanking;
 $("rankingAccess").onclick = () => tab("settings");
 $("creativeAccess").onclick = () => tab("settings");
 
